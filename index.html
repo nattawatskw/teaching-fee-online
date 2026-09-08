@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเบิกเงินค่าตอบแทนภาคสมทบ ป.ตรี</title>
+
+    
+    <!-- Google Fonts & TH Sarabun New -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lazywasabi/thai-web-fonts@7/fonts/THSarabunNew/style.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js (Bar chart for annual statistics) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- SheetJS (Excel .xlsx, .xls, .csv parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- PDF.js (PDF parser) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+    
+    <!-- Tesseract.js (Image OCR) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="text-sm md:text-base">
+
+    <!-- Navbar -->
+    <nav class="bg-[#1c2134] border-b border-[#2d3748] px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600/20 text-blue-400 p-2 rounded-lg">
+                <i class="fa-solid fa-graduation-cap text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-white">ระบบเบิกเงินค่าตอบแทนภาคสมทบ ป.ตรี</h1>
+                <p class="text-xs text-gray-400">วิทยาลัยเทคนิคอุบลราชธานี | ระบบจัดการภาคเรียนและปีการศึกษา</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btn-cloud-sync" class="bg-[#242b3d] hover:bg-[#2d3748] border border-[#3f4b61] text-gray-200 px-3.5 py-2 rounded-lg flex items-center gap-2 text-sm transition cursor-pointer shadow-sm" title="สถานะการซิงค์ข้อมูล Cloudflare">
+                <span id="cloud-sync-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                <span id="cloud-sync-text" class="text-xs font-medium">คลาวด์ซิงค์</span>
+            </button>
+            <button id="btn-batch-print" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition shadow-sm cursor-pointer">
+                <i class="fa-solid fa-print"></i> พิมพ์เอกสาร
+            </button>
+            <button id="btn-settings" class="bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition">
+                <i class="fa-solid fa-gear"></i> ตั้งค่า
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main id="main-app-container" class="container mx-auto px-4 py-8 max-w-6xl">
+
+        <!-- VIEW: Semesters List -->
+        <div id="view-semesters" class="view active space-y-8">
+            
+            <!-- Summary Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="card-gradient p-5 rounded-xl border border-[#2d3748] flex items-center gap-4">
+                    <div class="bg-[#2a2753] text-[#a78bfa] p-4 rounded-xl">
+                        <i class="fa-solid fa-calendar-days text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400">จำนวนภาคเรียนทั้งหมด</p>
+                        <p class="text-2xl font-bold text-white"><span id="stat-total-terms">0</span> <span class="text-lg font-normal">ภาคเรียน</span></p>
+                    </div>
+                </div>
+                <div class="card-gradient p-5 rounded-xl border border-[#2d3748] flex items-center gap-4">
+                    <div class="bg-[#1b3a35] text-[#34d399] p-4 rounded-xl">
+                        <i class="fa-solid fa-book text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400">จำนวนรายวิชารวมทุกเทอม</p>
+                        <p class="text-2xl font-bold text-white"><span id="stat-total-subjects">0</span> <span class="text-lg font-normal">รายวิชา</span></p>
+                    </div>
+                </div>
+                <div class="card-gradient p-5 rounded-xl border border-[#2d3748] flex items-center gap-4">
+                    <div class="bg-[#1e3a5f] text-[#60a5fa] p-4 rounded-xl">
+                        <i class="fa-solid fa-money-bill text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400">รวมยอดเงินขอเบิกทุกปี</p>
+                        <p class="text-2xl font-bold text-white"><span id="stat-total-money">0.00</span> <span class="text-lg font-normal">บาท</span></p>
+                    </div>
+                </div>
+            </div>
+
+                                    <!-- Annual / Semester Claim Stats Bar Chart (Money Only) -->
+            <div class="card-gradient p-5 md:p-6 rounded-xl border border-[#2d3748] shadow-lg">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 mb-4 pb-3 border-b border-[#2d3748]">
+                    <div>
+                        <h3 class="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-emerald-400"></i> สรุปยอดเงินค่าตอบแทนรายภาคเรียน / ปีการศึกษา
+                        </h3>
+                        <p class="text-xs text-gray-400 mt-0.5" id="chart-desc-text">กราฟแท่งแสดงยอดเงินขอเบิกค่าตอบแทน (แนวแกนนอน: ภาคเรียน / แนวแกนตั้ง: จำนวนเงิน บาท)</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 self-end lg:self-auto">
+                        <div id="chart-annual-badges" class="flex flex-wrap items-center gap-2">
+                            <!-- Dynamic badges per term/year -->
+                        </div>
+                        
+                        <!-- View Mode: แยกรายเทอม vs รวมรายปี -->
+                        <div class="inline-flex rounded-lg border border-[#2d3748] bg-[#0f121d] p-0.5 text-xs">
+                            <button type="button" id="btn-chart-view-term" class="px-2.5 py-1 rounded-md font-medium text-amber-300 bg-amber-950/60 border border-amber-500/40 transition cursor-pointer shadow-sm" title="ดูกราฟแยกตามแต่ละภาคเรียน (เทอม)">
+                                <i class="fa-solid fa-layer-group mr-1"></i>แยกรายเทอม
+                            </button>
+                            <button type="button" id="btn-chart-view-year" class="px-2.5 py-1 rounded-md font-medium text-gray-400 hover:text-white transition cursor-pointer" title="ดูกราฟรวมยอดรายปีการศึกษา">
+                                <i class="fa-solid fa-calendar mr-1"></i>รวมรายปี
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Main Bar Chart Canvas -->
+                <div class="relative h-64 w-full" id="annual-chart-container">
+                    <canvas id="canvas-annual-days"></canvas>
+                </div>
+            </div>
+
+            <!-- Semesters Header -->
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-blue-500"></i> ภาคเรียนและปีการศึกษาทั้งหมด (เลือกเทอมที่ต้องการจัดการ)
+                    </h2>
+                    <p class="text-sm text-gray-400 mt-1">คลิกเข้าสู่ภาคเรียนเพื่อจัดการรายวิชา เพิ่มวิชา หรือสร้างใบเบิกรวมประจำเทอมนั้นๆ</p>
+                </div>
+            </div>
+
+            <!-- Semesters Grid -->
+            <div id="semesters-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Semester Cards will be injected here -->
+            </div>
+        </div>
+
+        <!-- VIEW: Subjects List (Inside Semester) -->
+        <div id="view-subjects" class="view space-y-8">
+            <div class="flex items-center gap-4">
+                <button id="btn-back-semesters" class="bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition">
+                    <i class="fa-solid fa-arrow-left"></i> กลับหน้าเลือกภาคเรียน
+                </button>
+                <div class="bg-orange-900/40 border border-orange-500/30 text-orange-400 px-4 py-2 rounded-lg flex items-center gap-2 font-medium">
+                    <i class="fa-solid fa-graduation-cap"></i> <span id="current-term-label">ภาคเรียนที่ -</span>
+                </div>
+            </div>
+
+            <!-- Term Summary Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="card-gradient p-5 rounded-xl border border-[#2d3748] flex items-center gap-4">
+                    <div class="bg-[#31254a] text-[#c084fc] p-4 rounded-xl">
+                        <i class="fa-solid fa-floppy-disk text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400">จำนวนรายวิชาในเทอมนี้</p>
+                        <p class="text-2xl font-bold text-white"><span id="term-stat-subjects">0</span> <span class="text-lg font-normal">รายวิชา</span></p>
+                    </div>
+                </div>
+                <div class="card-gradient p-5 rounded-xl border border-[#2d3748] flex items-center gap-4">
+                    <div class="bg-[#1b3a35] text-[#34d399] p-4 rounded-xl">
+                        <i class="fa-solid fa-money-bill-wave text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400">รวมยอดเงินขอเบิกในเทอมนี้</p>
+                        <p class="text-2xl font-bold text-white"><span id="term-stat-money">0.00</span> <span class="text-lg font-normal">บาท</span></p>
+                    </div>
+                </div>
+                <div class="card-gradient p-5 rounded-xl border border-[#2d3748] flex items-center gap-4">
+                    <div class="bg-[#1e3a5f] text-[#60a5fa] p-4 rounded-xl">
+                        <i class="fa-solid fa-user-tie text-2xl"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                        <p class="text-sm text-gray-400">ผู้ขอเบิกเงินหลัก</p>
+                        <p class="text-lg font-bold text-white truncate" id="term-main-teacher">นายณัฐวรรธน์ เกษกุล</p>
+                    </div>
+                </div>
+            </div>
+
+                        <!-- Term Rate Calculator Panel: คำนวณอัตราการเบิก (บาท/ชม.) -->
+            <div id="term-rate-calc-card" class="rounded-2xl border border-blue-500/30 p-5 shadow-xl bg-gradient-to-r from-[#171c2d] via-[#1a2138] to-[#171c2d]">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-[#2d3748] pb-4 mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-xl flex-shrink-0">
+                            <i class="fa-solid fa-calculator"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <span>คำนวณอัตราการเบิกค่าสอน (บาท/ชม.)</span>
+                                <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-900/50 text-blue-300 border border-blue-500/30 font-semibold">ตัดเศษทิ้ง</span>
+                            </h3>
+                            <p class="text-xs text-gray-400 mt-0.5">
+                                ป้อนงบอุดหนุนเพื่อคำนวณอัตราเบิกต่อชั่วโมง (งบอุดหนุน ÷ ชั่วโมงสอนรวม = อัตรา บาท/ชม.)
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" id="btn-apply-rate-to-all" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/20 whitespace-nowrap">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> นำอัตรานี้ไปใช้กับทุกรายวิชาในเทอม
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- 1. งบอุดหนุน -->
+                    <div class="bg-[#141725] p-3.5 rounded-xl border border-[#2d3748] space-y-1.5">
+                        <label class="block text-xs font-semibold text-gray-300 flex items-center justify-between">
+                            <span><i class="fa-solid fa-hand-holding-dollar text-emerald-400 mr-1"></i> 1. งบอุดหนุนที่ได้รับ (บาท)</span>
+                            <span class="text-[10px] text-gray-400">กรอกตัวเลข</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="term-calc-budget" class="w-full p-2.5 pr-12 rounded-lg text-sm font-bold bg-[#0f121d] border border-emerald-500/40 focus:border-emerald-400 text-emerald-300 placeholder-gray-500" placeholder="เช่น 10000" min="0" step="any">
+                            <span class="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">บาท</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400">เช่น 10,000 หรือยอดเงินงบประมาณที่ได้รับ</p>
+                    </div>
+
+                    <!-- 2. จำนวน ชม. สอนรวม -->
+                    <div class="bg-[#141725] p-3.5 rounded-xl border border-[#2d3748] space-y-1.5">
+                        <label class="block text-xs font-semibold text-gray-300 flex items-center justify-between">
+                            <span><i class="fa-solid fa-clock text-blue-400 mr-1"></i> 2. จำนวน ชม. ที่สอนรวม (ชม.)</span>
+                            <span class="text-[10px] text-blue-400 cursor-pointer hover:underline" id="btn-sync-term-hours" title="ดึงค่ารวมจากรายวิชาใหม่"><i class="fa-solid fa-rotate mr-0.5"></i>ดึงอัตโนมัติ</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="term-calc-hours" class="w-full p-2.5 pr-12 rounded-lg text-sm font-bold bg-[#0f121d] border border-blue-500/40 focus:border-blue-400 text-blue-300 placeholder-gray-500" placeholder="รวม ชม." min="1" step="any">
+                            <span class="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">ชม.</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-gray-400 gap-1">
+                            <span id="term-calc-hours-desc" class="truncate">ดึงมาจากผลรวมชั่วโมงของทุกวิชา</span>
+                            <button type="button" id="btn-toggle-calc-subjects" class="text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 flex-shrink-0 cursor-pointer font-medium" title="คลิกเพื่อเลือกวิชาที่นำมาคิด ชม.">
+                                <i class="fa-solid fa-list-check"></i> ติ๊กเลือกวิชา (<span id="calc-selected-count">0/0</span>)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. อัตราการเบิกที่คำนวณได้ -->
+                    <div class="bg-[#141725] p-3.5 rounded-xl border border-[#2d3748] space-y-1.5">
+                        <label class="block text-xs font-semibold text-gray-300 flex items-center justify-between">
+                            <span><i class="fa-solid fa-coins text-amber-400 mr-1"></i> 3. อัตราเบิก (บาท/ชม.)</span>
+                            <span class="text-[10px] text-amber-400 font-medium">ตัดเศษทิ้ง (แก้ไขได้)</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="term-calc-rate" class="w-full p-2.5 pr-16 rounded-lg text-sm font-bold bg-[#0f121d] border border-amber-500/40 focus:border-amber-400 text-amber-300 placeholder-gray-500" placeholder="0" min="0" step="any">
+                            <span class="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">บาท/ชม.</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-gray-400">
+                            <span id="term-calc-formula-display">สูตร: งบอุดหนุน ÷ ชม. รวม</span>
+                            <span id="term-calc-auto-saved" class="text-emerald-400 hidden"><i class="fa-solid fa-check"></i> บันทึกแล้ว</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expandable Subject Selection Panel for Rate Calculation -->
+                <div id="container-calc-subjects-selector" class="hidden mt-4 pt-3 border-t border-[#2d3748] bg-[#0f121d]/90 p-4 rounded-xl border border-blue-500/30 space-y-3">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <i class="fa-solid fa-square-check text-blue-400"></i> เลือกรายวิชาที่นำมาคิด ชม. ในการเบิก
+                            </h4>
+                            <p class="text-[11px] text-gray-400 mt-0.5">
+                                ติ๊กเลือกวิชาที่ต้องการนำ ชม. มาคำนวณอัตราเบิก (วิชาที่ไม่ถูกติ๊กจะไม่นำมาคิด ชม.)
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 self-end sm:self-auto">
+                            <button type="button" id="btn-calc-select-all" class="text-[11px] px-2.5 py-1 rounded bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 border border-blue-500/30 transition cursor-pointer">เลือกทั้งหมด</button>
+                            <button type="button" id="btn-calc-deselect-all" class="text-[11px] px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 transition cursor-pointer">ไม่เลือกทั้งหมด</button>
+                            <button type="button" id="btn-close-calc-subjects" class="text-gray-400 hover:text-white ml-2 text-sm p-1 cursor-pointer" title="ปิดหน้าต่าง"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div id="calc-subjects-checkbox-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1 max-h-56 overflow-y-auto custom-scrollbar">
+                        <!-- Dynamic subject checkboxes -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-blue-500"></i> รายวิชาที่สอนในภาคเรียนนี้
+                    </h2>
+                    <p class="text-sm text-gray-400 mt-1">คลิกเข้าสู่รายวิชาเพื่อกรอกฟอร์มเบิก คำนวณ 18 สัปดาห์ หรือสั่งพิมพ์ PDF ใบเบิกรายวิชา</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <button id="btn-add-subject" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition">
+                        <i class="fa-solid fa-plus"></i> เพิ่มรายวิชาในเทอมนี้
+                    </button>
+                    <div class="relative flex-1 md:w-64">
+                        <input type="text" id="search-subject-term" placeholder="🔍 ค้นหา รหัสวิชา / ชื่อวิชา..." class="w-full p-2 pl-3 rounded-lg text-sm bg-[#0f121d] border border-[#2d3748] text-white">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subjects Grid -->
+            <div id="subjects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Subject Cards will be injected here -->
+            </div>
+
+            <!-- Top Menu Section: ใบเบิกรวม (ตราครุฑ) -->
+            <div id="bottom-summary-claim-bar" class="mb-6 border border-orange-500/40 bg-gradient-to-r from-[#1c2134] via-[#242940] to-[#1c2134] rounded-2xl p-5 sm:p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-5 transition hover:border-orange-500/70">
+                <div class="flex items-center gap-4 w-full md:w-auto">
+                    <div class="w-14 h-14 rounded-2xl bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center text-2xl flex-shrink-0 shadow-lg shadow-orange-500/10">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                                เอกสารสำคัญทางการเงิน
+                            </span>
+                            <span class="text-xs text-gray-400">สำหรับเบิกงบประมาณภาคเรียนนี้</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mt-1">ใบเบิกรวมค่าสอน ป.ตรี (ตราครุฑ)</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">
+                            ออกเอกสารหลักฐานขออนุมัติเบิกจ่ายเงินค่าตอบแทนสอนเกินภาระงานสอนภาคการศึกษานี้ สามารถเลือกวิชาที่จะเบิก และพิมพ์เอกสารตราครุฑแบบต้นฉบับได้ทันที
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex-shrink-0 w-full md:w-auto">
+                    <button type="button" id="btn-open-summary-claim" class="btn-open-summary-claim w-full md:w-auto bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2.5 text-sm transition-all transform hover:-translate-y-0.5 cursor-pointer">
+                        <i class="fa-solid fa-file-invoice text-base"></i>
+                        <span>สรุปและพิมพ์ใบเบิกรวม (ตราครุฑ)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Teacher Leaves & Official Travel Management Section -->
+                <div id="term-teacher-leaves-card" class="bg-[#1a1f2e] border border-[#2d3748] rounded-2xl p-5 sm:p-6 shadow-xl space-y-4 mb-6 transition hover:border-amber-500/40">
+                    <!-- Header -->
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#2d3748] pb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-lg flex-shrink-0">
+                                <i class="fa-solid fa-calendar-xmark"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                        บันทึกวันลา / ไปราชการของอาจารย์ผู้สอน
+                                    </h3>
+                                    <span id="term-leaves-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        0 รายการ
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-0.5">
+                                    บันทึกช่วงวันที่อาจารย์ไปราชการหรือลา ระบบจะหักวันสอนและแสดง "ไปราชการ" หรือ "ลา" ในตารางสอน 18 สัปดาห์อัตโนมัติ
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" id="btn-toggle-teacher-leaves" class="text-xs px-3 py-1.5 rounded-lg bg-[#242940] hover:bg-[#2e3552] text-gray-300 border border-[#2d3748] transition flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-chevron-down transition-transform" id="icon-toggle-leaves"></i>
+                            <span id="label-toggle-leaves">ซ่อน/แสดง</span>
+                        </button>
+                    </div>
+
+                    <div id="container-teacher-leaves-body" class="space-y-4">
+                        <!-- Form to Add / Edit Leave Record -->
+                        <div class="bg-[#0f121d]/80 border border-amber-500/20 rounded-xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-plus-circle" id="leave-form-icon"></i> <span id="leave-form-mode-text">เพิ่มรายการวันลา / ไปราชการใหม่</span>
+                                </div>
+                                <span id="leave-editing-indicator" class="hidden px-2.5 py-0.5 rounded-full text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1">
+                                    <i class="fa-solid fa-pen-to-square text-[10px]"></i> กำลังแก้ไขรายการ
+                                </span>
+                            </div>
+                            <input type="hidden" id="leave-editing-id" value="">
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                                <!-- 1. Teacher Selector (col 4) -->
+                                <div class="md:col-span-4">
+                                    <label class="block text-xs text-gray-300 font-medium mb-1">
+                                        ชื่ออาจารย์ผู้สอน <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input type="text" id="leave-input-teacher-name" list="leave-teacher-datalist" placeholder="พิมพ์ชื่อหรือเลือกอาจารย์..." class="w-full p-2 pl-3 pr-8 rounded-lg text-xs bg-[#161a29] border border-[#2d3748] text-white focus:border-amber-500 focus:outline-none" autocomplete="off">
+                                        <datalist id="leave-teacher-datalist">
+                                            <!-- Populated with teachers -->
+                                        </datalist>
+                                        <i class="fa-solid fa-chalkboard-user absolute right-2.5 top-2.5 text-gray-500 text-xs pointer-events-none"></i>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Type Selector (col 2) -->
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs text-gray-300 font-medium mb-1">
+                                        ประเภท <span class="text-red-400">*</span>
+                                    </label>
+                                    <select id="leave-input-type" class="w-full p-2 rounded-lg text-xs bg-[#161a29] border border-[#2d3748] text-white focus:border-amber-500 focus:outline-none cursor-pointer">
+                                        <option value="ไปราชการ">ไปราชการ</option>
+                                        <option value="ลากิจ">ลากิจ</option>
+                                        <option value="ลาป่วย">ลาป่วย</option>
+                                        <option value="ลาพักผ่อน">ลาพักผ่อน</option>
+                                        <option value="ลาอื่นๆ">ลาอื่นๆ</option>
+                                    </select>
+                                </div>
+
+                                <!-- 3. Start Date (col 2) -->
+                                <div class="md:col-span-2 relative">
+                                    <label class="block text-xs text-gray-300 font-medium mb-1">
+                                        ตั้งแต่วันที่ <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative flex items-center">
+                                        <input type="text" id="leave-input-start-date-th" placeholder="วว/ดด/ปปปป" maxlength="10" class="w-full p-2 pr-8 rounded-lg text-xs bg-[#161a29] border border-[#2d3748] text-amber-200 font-mono focus:border-amber-500 focus:outline-none" autocomplete="off">
+                                        <button type="button" id="btn-leave-start-cal" class="absolute right-1.5 p-1 text-gray-400 hover:text-amber-400 transition cursor-pointer" title="เลือกจากปฏิทินไทย">
+                                            <i class="fa-regular fa-calendar-days text-xs text-amber-400"></i>
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="leave-input-start-date-iso">
+                                </div>
+
+                                <!-- 4. End Date (col 2) -->
+                                <div class="md:col-span-2 relative">
+                                    <label class="block text-xs text-gray-300 font-medium mb-1">
+                                        ถึงวันที่ <span class="text-red-400">*</span>
+                                    </label>
+                                    <div class="relative flex items-center">
+                                        <input type="text" id="leave-input-end-date-th" placeholder="วว/ดด/ปปปป" maxlength="10" class="w-full p-2 pr-8 rounded-lg text-xs bg-[#161a29] border border-[#2d3748] text-amber-200 font-mono focus:border-amber-500 focus:outline-none" autocomplete="off">
+                                        <button type="button" id="btn-leave-end-cal" class="absolute right-1.5 p-1 text-gray-400 hover:text-amber-400 transition cursor-pointer" title="เลือกจากปฏิทินไทย">
+                                            <i class="fa-regular fa-calendar-days text-xs text-amber-400"></i>
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="leave-input-end-date-iso">
+                                </div>
+
+                                <!-- 5. Button Add / Save & Cancel (col 2) -->
+                                <div class="md:col-span-2 flex items-end gap-1.5">
+                                    <button type="button" id="btn-add-teacher-leave" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-medium p-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-600/20 cursor-pointer">
+                                        <i class="fa-solid fa-plus" id="btn-add-leave-icon"></i> <span id="btn-add-leave-label">เพิ่มรายการ</span>
+                                    </button>
+                                    <button type="button" id="btn-cancel-edit-leave" class="hidden bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium p-2 px-2.5 rounded-lg text-xs transition items-center justify-center gap-1 cursor-pointer" title="ยกเลิกการแก้ไข">
+                                        <i class="fa-solid fa-xmark"></i> ยกเลิก
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Note / Description (Optional) -->
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
+                                <div class="md:col-span-12">
+                                    <input type="text" id="leave-input-note" placeholder="หมายเหตุ / รายละเอียดเพิ่มเติม (เช่น ไปราชการอบรมสัมมนา, ศึกษาดูงาน, สอบประเมิน...)" class="w-full p-1.5 px-3 rounded-lg text-xs bg-[#161a29] border border-[#2d3748] text-gray-300 focus:border-amber-500 focus:outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Saved Leaves Table / List -->
+                        <div class="overflow-x-auto rounded-xl border border-[#2d3748]">
+                            <table class="w-full text-xs text-left text-gray-300">
+                                <thead class="text-[11px] uppercase bg-[#141725] text-gray-400 border-b border-[#2d3748]">
+                                    <tr>
+                                        <th class="px-3 py-2 text-center w-12">#</th>
+                                        <th class="px-3 py-2">อาจารย์ผู้สอน</th>
+                                        <th class="px-3 py-2 text-center w-24">ประเภท</th>
+                                        <th class="px-3 py-2 text-center w-48">ช่วงวันที่ (ไปราชการ/ลา)</th>
+                                        <th class="px-3 py-2">หมายเหตุ</th>
+                                        <th class="px-3 py-2 text-center w-36">ผลกระทบในเทอม</th>
+                                        <th class="px-3 py-2 text-center w-20">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="term-teacher-leaves-table-body" class="divide-y divide-[#2d3748] bg-[#1a1f2e]">
+                                    <!-- Injected dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thai Calendar Popup for Teacher Leaves (Dropdown Modal) -->
+                <div id="leave-calendar-popup" class="hidden fixed bg-[#1c2134] border border-[#2d3748] rounded-xl p-3 shadow-2xl z-[100] text-xs w-72 sm:w-80">
+                    <div class="flex items-center justify-between mb-2">
+                        <button type="button" id="leave-cal-prev-month" class="p-1 hover:bg-[#2d3748] text-gray-300 rounded cursor-pointer"><i class="fa-solid fa-chevron-left"></i></button>
+                        <div class="flex items-center gap-1.5 font-bold text-xs text-white">
+                            <select id="leave-cal-month-select" class="bg-[#0f121d] text-white border border-[#2d3748] rounded px-1.5 py-0.5 text-xs cursor-pointer">
+                            </select>
+                            <select id="leave-cal-year-select" class="bg-[#0f121d] text-white border border-[#2d3748] rounded px-1.5 py-0.5 text-xs cursor-pointer">
+                            </select>
+                        </div>
+                        <button type="button" id="leave-cal-next-month" class="p-1 hover:bg-[#2d3748] text-gray-300 rounded cursor-pointer"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                    
+                    <div class="grid grid-cols-7 gap-1 text-center font-semibold text-[11px] text-gray-400 mb-1">
+                        <span class="text-red-400">อา</span>
+                        <span>จ</span>
+                        <span>อ</span>
+                        <span>พ</span>
+                        <span>พฤ</span>
+                        <span>ศ</span>
+                        <span class="text-blue-400">ส</span>
+                    </div>
+                    
+                    <div id="leave-cal-days-grid" class="grid grid-cols-7 gap-1 text-center text-xs">
+                    </div>
+                    
+                    <div class="border-t border-[#2d3748] mt-2 pt-2 flex items-center justify-between text-[11px]">
+                        <span class="text-red-400 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> วันหยุดราชการ
+                        </span>
+                        <button type="button" id="leave-cal-btn-today" class="text-amber-400 hover:underline cursor-pointer">วันนี้</button>
+                    </div>
+                    <div id="leave-cal-holiday-detail" class="mt-1 text-[11px] text-red-300 min-h-[16px] truncate font-medium"></div>
+                </div>
+</div>
+
+        <!-- VIEW: Individual Claim Form (หน้าใบเบิก) -->
+        <div id="view-claim-form" class="view hidden w-full min-h-screen">
+            
+            <!-- Claim Form Top Bar -->
+            <div id="claim-header-bar" class="bg-[#1c2134] border-b border-[#2d3748] px-4 md:px-6 py-3 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-30 shadow-md w-full">
+                <div class="flex items-center gap-2">
+                    <button id="btn-back-to-term" class="bg-[#141725] hover:bg-[#2d3748] text-gray-300 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#2d3748] transition">
+                        <i class="fa-solid fa-arrow-left"></i> รายวิชาในเทอมนี้
+                    </button>
+                    <div class="bg-blue-950/40 border border-blue-500/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 max-w-md truncate">
+                        <i class="fa-solid fa-book-open text-blue-400"></i>
+                        <span id="claim-header-subject-name">การออกแบบโครงสร้างคอนกรีตเสริมเหล็ก (27-40121-2106)</span>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="btn-claim-settings" class="bg-[#141725] hover:bg-[#2d3748] text-gray-300 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#2d3748] transition">
+                        <i class="fa-solid fa-gear"></i> ตั้งค่าระบบ
+                    </button>
+                    <button id="btn-save-claim" class="bg-[#141725] hover:bg-[#2d3748] text-green-400 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#2d3748] transition font-medium">
+                        <i class="fa-solid fa-floppy-disk"></i> บันทึก
+                    </button>
+                    <button id="btn-export-json" class="bg-[#141725] hover:bg-[#2d3748] text-gray-300 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#2d3748] transition">
+                        <i class="fa-solid fa-download"></i> ส่งออก JSON
+                    </button>
+                    <button id="btn-reset-rc" class="bg-[#141725] hover:bg-red-950/40 text-red-400 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-[#2d3748] transition" title="โหลดข้อมูลตัวอย่างวิชา RC">
+                        <i class="fa-solid fa-rotate-left"></i> ค่าเริ่มต้น RC
+                    </button>
+                    <button id="btn-print-claim" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-1.5 rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 transition">
+                        <i class="fa-solid fa-print"></i> พิมพ์เอกสาร / บันทึก PDF (A4)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Layout: Sidebar & Preview -->
+            <div id="claim-main-container" class="flex flex-col lg:flex-row min-h-[calc(100vh-60px)] w-full">
+                
+                <!-- Left Sidebar: Controls -->
+                <div id="claim-sidebar" class="w-full lg:w-[460px] xl:w-[480px] bg-[#1c2134] border-r border-[#2d3748] p-4 lg:p-5 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-60px)] flex-shrink-0">
+                    
+                    <!-- Sidebar Tabs -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-[#141725] p-1 rounded-lg border border-[#2d3748] text-xs">
+                        <button class="claim-tab-btn active py-2 px-1 rounded text-center text-blue-400 bg-blue-900/40 font-medium transition" data-target="claim-tab-subject">
+                            <i class="fa-solid fa-file-pen block sm:inline mb-1 sm:mb-0"></i> 1. ข้อมูลวิชา
+                        </button>
+                        <button class="claim-tab-btn py-2 px-1 rounded text-center text-gray-400 hover:text-gray-200 transition" data-target="claim-tab-calendar">
+                            <i class="fa-solid fa-calendar-days block sm:inline mb-1 sm:mb-0"></i> <span id="tab-calendar-title">2. ตาราง 18 สัปดาห์</span>
+                        </button>
+                        <button class="claim-tab-btn py-2 px-1 rounded text-center text-gray-400 hover:text-gray-200 transition" data-target="claim-tab-signatures">
+                            <i class="fa-solid fa-signature block sm:inline mb-1 sm:mb-0"></i> 3. รายชื่อลายเซ็น
+                        </button>
+                        <button class="claim-tab-btn py-2 px-1 rounded text-center text-gray-400 hover:text-gray-200 transition" data-target="claim-tab-students">
+                            <i class="fa-solid fa-users block sm:inline mb-1 sm:mb-0"></i> 4. รายชื่อนักศึกษา
+                        </button>
+                    </div>
+
+                    <!-- Sidebar Tab 1: ข้อมูลวิชา -->
+                    <div id="claim-tab-subject" class="claim-tab-content space-y-4">
+                        <!-- Top Row: ระดับชั้น/ชั้นปี และ ปีการศึกษา (ดึงจากหน้าแรกอัตโนมัติ แต่พิมพ์แก้ไขได้) -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1 font-semibold flex items-center gap-1.5">
+                                    <i class="fa-solid fa-layer-group text-purple-400"></i> ระดับชั้น / ชั้นปี
+                                </label>
+                                <input type="text" id="claim-input-level" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white focus:border-purple-400" value="ชั้นปี 1" placeholder="เช่น ชั้นปี 1">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1 font-semibold flex items-center gap-1.5">
+                                    <i class="fa-regular fa-calendar text-amber-400"></i> ปีการศึกษา <span class="text-[10px] text-amber-400/80 font-normal">(ดึงอัตโนมัติ/แก้ไขได้)</span>
+                                </label>
+                                <input type="text" id="claim-input-academic-year" class="w-full p-2 rounded-lg text-xs font-semibold bg-[#0f121d] border border-amber-500/40 text-amber-300 focus:border-amber-400" placeholder="เช่น 1/2568" value="1/2568">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1 font-semibold flex items-center gap-1.5">
+                                <i class="fa-solid fa-graduation-cap text-blue-400"></i> สาขาวิชา
+                            </label>
+                            <input type="text" id="claim-input-dept" class="w-full p-2 rounded-lg text-xs font-semibold bg-[#0f121d] border border-blue-500/40 text-blue-300 focus:border-blue-400" placeholder="เช่น เทคโนโลยีโยธา" value="เทคโนโลยีโยธา">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">เลือกดึงข้อมูลอัตโนมัติจากหลักสูตร ป.ตรี (เทคโนโลยีโยธา)</label>
+                            <select id="claim-subject-preset" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-orange-500/40 text-orange-300">
+                                <option value="">-- เลือกดึงข้อมูลอัตโนมัติจากหลักสูตร ป.ตรี --</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Teacher Selection with Autocomplete -->
+                        <div class="relative">
+                            <label class="block text-xs text-gray-400 mb-1">
+                                อาจารย์ผู้สอน <span class="text-[11px] text-blue-400 font-normal">(พิมพ์ค้นหาจาก 273 ท่าน หรือพิมพ์ระบุเอง)</span>
+                            </label>
+                            <div class="relative">
+                                <input type="text" id="claim-input-teacher" class="w-full p-2 pr-7 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] focus:border-blue-500 text-white" placeholder="พิมพ์ชื่ออาจารย์ เช่น ณัฐวรรธน์..." autocomplete="off">
+                                <button type="button" id="btn-clear-claim-teacher" class="hidden absolute right-2.5 top-2 text-gray-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div id="dropdown-claim-teacher-list" class="hidden absolute left-0 right-0 top-full mt-1 bg-[#141725] border border-[#2d3748] rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl p-1 space-y-0.5">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="relative">
+                                <label class="block text-xs text-gray-400 mb-1">รหัสวิชา</label>
+                                <input type="text" id="claim-input-code" class="w-full p-2 rounded-lg text-xs" value="27-40121-2106" autocomplete="off" placeholder="พิมพ์ค้นหารหัส...">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">จำนวนหน่วยกิต</label>
+                                <input type="number" id="claim-input-credits" class="w-full p-2 rounded-lg text-xs" value="3">
+                            </div>
+                        </div>
+
+                        <div class="relative">
+                            <label class="block text-xs text-gray-400 mb-1">ชื่อวิชา</label>
+                            <input type="text" id="claim-input-name" class="w-full p-2 rounded-lg text-xs" value="การออกแบบโครงสร้างคอนกรีตเสริมเหล็ก" autocomplete="off" placeholder="พิมพ์ชื่อวิชา เช่น การสำรวจ, ออกแบบ...">
+                        </div>
+
+                        <!-- Hours breakdown: ชม. ทฤษฎี, ชม. ปฏิบัติ, ชม. รวม -->
+                        <div class="grid grid-cols-3 gap-2 bg-[#141725] p-2.5 rounded-lg border border-[#2d3748]">
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1 font-medium">ชม. ทฤษฎี</label>
+                                <input type="number" id="claim-input-theory-hours" class="w-full p-1.5 rounded-md text-xs text-center font-bold text-blue-300 bg-[#0f121d] border border-[#2d3748] focus:border-blue-500" value="3" min="0" max="30">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1 font-medium">ชม. ปฏิบัติ</label>
+                                <input type="number" id="claim-input-practice-hours" class="w-full p-1.5 rounded-md text-xs text-center font-bold text-orange-300 bg-[#0f121d] border border-[#2d3748] focus:border-orange-500" value="0" min="0" max="30">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1 font-medium">ชม. รวม/สัปดาห์</label>
+                                <input type="number" id="claim-input-weekly-hours" class="w-full p-1.5 rounded-md text-xs text-center font-bold text-emerald-400 bg-[#0f121d] border border-emerald-500/40 focus:border-emerald-400" value="3" min="1" max="40">
+                            </div>
+                        </div>
+
+                        <!-- Calendar Dates Config (Start Date & End Date) -->
+                        <div class="border-t border-[#2d3748] pt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-calendar-check"></i> <span id="label-calc-weeks">คำนวณปฏิทิน 18 สัปดาห์อัตโนมัติ</span>
+                                </h4>
+                                <button type="button" id="btn-recalculate-calendar" class="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                                    <i class="fa-solid fa-rotate"></i> คำนวณวันใหม่
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div class="relative">
+                                    <label class="block text-xs text-gray-400 mb-1">วันที่เริ่มต้น</label>
+                                    <div class="relative flex items-center">
+                                        <input type="text" id="claim-input-start-date-th" class="w-full p-2 pr-9 rounded-lg text-xs font-semibold tracking-wide bg-[#0f121d] border border-[#2d3748] focus:border-blue-500 text-blue-300" placeholder="29/05/2569" maxlength="10" autocomplete="off" value="02/06/2568">
+                                        <button type="button" id="btn-open-thai-calendar" class="absolute right-2 text-gray-400 hover:text-blue-400 p-1 text-sm transition" title="เปิดปฏิทินไทยเลือกวันและดูวันหยุด">
+                                            <i class="fa-regular fa-calendar-days text-blue-400"></i>
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="claim-input-start-date" value="2025-06-02">
+
+                                    <!-- Thai Buddhist Calendar Popup Dropdown -->
+                                    <div id="thai-calendar-popup" class="hidden absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-[#1c2134] border border-[#2d3748] rounded-xl p-3 shadow-2xl z-50 text-xs">
+                                        <!-- Calendar Header (Month/Year controls) -->
+                                        <div class="flex items-center justify-between mb-2">
+                                            <button type="button" id="cal-prev-month" class="p-1 hover:bg-[#2d3748] text-gray-300 rounded"><i class="fa-solid fa-chevron-left"></i></button>
+                                            <div class="flex items-center gap-1.5 font-bold text-xs text-white">
+                                                <select id="cal-month-select" class="bg-[#0f121d] text-white border border-[#2d3748] rounded px-1.5 py-0.5 text-xs">
+                                                    <!-- Months 1-12 in Thai injected dynamically -->
+                                                </select>
+                                                <select id="cal-year-select" class="bg-[#0f121d] text-white border border-[#2d3748] rounded px-1.5 py-0.5 text-xs">
+                                                    <!-- Years 2565 - 2575 BE injected dynamically -->
+                                                </select>
+                                            </div>
+                                            <button type="button" id="cal-next-month" class="p-1 hover:bg-[#2d3748] text-gray-300 rounded"><i class="fa-solid fa-chevron-right"></i></button>
+                                        </div>
+                                        
+                                        <!-- Day-of-week header -->
+                                        <div class="grid grid-cols-7 gap-1 text-center font-semibold text-[11px] text-gray-400 mb-1">
+                                            <span class="text-red-400">อา</span>
+                                            <span>จ</span>
+                                            <span>อ</span>
+                                            <span>พ</span>
+                                            <span>พฤ</span>
+                                            <span>ศ</span>
+                                            <span class="text-blue-400">ส</span>
+                                        </div>
+                                        
+                                        <!-- Calendar Days Grid -->
+                                        <div id="cal-days-grid" class="grid grid-cols-7 gap-1 text-center text-xs">
+                                            <!-- Dynamically generated day buttons -->
+                                        </div>
+                                        
+                                        <!-- Calendar Footer -->
+                                        <div class="border-t border-[#2d3748] mt-2 pt-2 flex items-center justify-between text-[11px]">
+                                            <span class="text-red-400 flex items-center gap-1">
+                                                <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> วันหยุดราชการไทย
+                                            </span>
+                                            <button type="button" id="cal-btn-today" class="text-blue-400 hover:underline">วันนี้</button>
+                                        </div>
+                                        <div id="cal-holiday-detail" class="mt-1 text-[11px] text-red-300 min-h-[16px] truncate font-medium"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1" id="label-end-date">วันสิ้นสุด (คำนวณ 18 สัปดาห์)</label>
+                                    <input type="text" id="claim-input-end-date" class="w-full p-2 rounded-lg text-xs bg-[#141725] text-gray-300" readonly value="29 เดือน กันยายน พ.ศ. 2568">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Teaching Days Per Week (Placed below Start Date) -->
+                        <div class="border-t border-[#2d3748] pt-3 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs text-gray-300 font-semibold flex items-center gap-1.5">
+                                    <i class="fa-solid fa-calendar-days text-blue-400"></i> จำนวนวันสอนต่อสัปดาห์
+                                </label>
+                                <div class="flex items-center gap-1.5">
+                                    <input type="number" id="claim-input-days-per-week" min="1" max="7" class="w-16 p-1.5 rounded-lg text-xs bg-[#0f121d] border border-blue-500/40 text-blue-300 font-bold text-center focus:border-blue-400" value="1">
+                                    <span class="text-xs text-gray-400">วัน / สัปดาห์</span>
+                                </div>
+                            </div>
+
+                            <!-- Quick Day Presets -->
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-[10px] text-gray-400">เลือกด่วน:</span>
+                                <button type="button" class="btn-quick-day-preset px-2 py-0.5 rounded text-[11px] bg-[#141725] hover:bg-blue-900/40 text-gray-300 border border-[#2d3748]" data-days="1">1 วัน (18 สัปดาห์)</button>
+                                <button type="button" class="btn-quick-day-preset px-2 py-0.5 rounded text-[11px] bg-[#141725] hover:bg-blue-900/40 text-gray-300 border border-[#2d3748]" data-days="2">2 วัน (9 สัปดาห์)</button>
+                                <button type="button" class="btn-quick-day-preset px-2 py-0.5 rounded text-[11px] bg-[#141725] hover:bg-blue-900/40 text-gray-300 border border-[#2d3748]" data-days="3">3 วัน (6 สัปดาห์)</button>
+                                <button type="button" class="btn-quick-day-preset px-2 py-0.5 rounded text-[11px] bg-[#141725] hover:bg-blue-900/40 text-gray-300 border border-[#2d3748]" data-days="4">4 วัน (5 สัปดาห์)</button>
+                            </div>
+                        </div>
+
+                        <!-- Hidden fallback inputs for compatibility -->
+                        <input type="hidden" id="claim-input-time" value="17.00-20.00">
+
+                        <!-- Detailed Daily Schedule Config -->
+                        <div class="bg-[#141725] p-3 rounded-lg border border-[#2d3748] space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-clock text-blue-400"></i> รายละเอียดวันและเวลาสอนแต่ละวัน
+                                </label>
+                                <span class="text-[10px] text-blue-400 font-medium px-2 py-0.5 rounded bg-blue-950/60 border border-blue-500/30" id="badge-teaching-mode">1 วัน/สัปดาห์ (18 สัปดาห์)</span>
+                            </div>
+
+                            <!-- Dynamic Container for Day 1, Day 2, Day 3, etc. -->
+                            <div id="container-daily-configs" class="space-y-2">
+                                <!-- Day cards dynamically rendered -->
+                            </div>
+
+                            <div class="flex justify-between items-center pt-1 border-t border-[#2d3748]">
+                                <button type="button" id="btn-add-teaching-day" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มวันสอน (+1 วัน)
+                                </button>
+                                <button type="button" id="btn-remove-teaching-day" class="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1">
+                                    <i class="fa-solid fa-minus"></i> ลดวันสอน (-1 วัน)
+                                </button>
+                            </div>
+
+                            <!-- Table layout option for Page 1 -->
+                            <div id="container-summer-layout" class="pt-1">
+                                <label class="block text-[10px] text-gray-400 mb-0.5">การจัดวางตารางในใบเบิกเงิน (A4)</label>
+                                <select id="claim-summer-layout" class="w-full p-1.5 rounded bg-[#0f121d] border border-[#2d3748] text-xs text-gray-300">
+                                    <option value="side_by_side">แบ่งคอลัมน์ ซ้าย=ครั้งที่ 1 / ขวา=ครั้งที่ 2 (สำหรับ 2 วัน/สัปดาห์)</option>
+                                    <option value="sequential" selected>เรียงลำดับตามครั้งที่เรียน 1-18 (ซ้าย=ครั้ง 1-9 / ขวา=ครั้ง 10-18)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-[#2d3748] pt-3">
+                            <h4 class="text-xs font-bold text-green-400 mb-2 flex items-center gap-1.5">
+                                <i class="fa-solid fa-calculator"></i> การคำนวณเงินค่าตอบแทน
+                            </h4>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">อัตราเบิก (บาท/ชม.)</label>
+                                    <input type="number" id="claim-input-rate" class="w-full p-2 rounded-lg text-xs" value="42">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">จำนวนนักศึกษา (คน)</label>
+                                    <input type="number" id="claim-input-students" class="w-full p-2 rounded-lg text-xs" value="6">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">คิดเป็นร้อยละ (%)</label>
+                                    <input type="number" id="claim-input-percent" class="w-full p-2 rounded-lg text-xs" value="60">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 bg-[#141725] p-3 rounded-lg border border-[#2d3748] mt-3">
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="text-xs text-gray-400">รวมชั่วโมงสอน</label>
+                                        <button type="button" id="btn-sync-claim-hours" class="text-[10px] text-blue-400 hover:text-blue-300 hover:underline cursor-pointer flex items-center gap-1" title="ดึงชั่วโมงคำนวณตามตารางสอนอัตโนมัติ">
+                                            <i class="fa-solid fa-arrows-rotate"></i> ดึงจากตาราง
+                                        </button>
+                                    </div>
+                                    <div class="relative">
+                                        <input type="number" id="claim-input-total-hours" class="w-full p-1.5 pr-10 rounded-lg bg-[#1c2134] border border-[#2d3748] text-white font-bold text-base focus:border-blue-500 focus:outline-none" value="45" step="1" min="0">
+                                        <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">ชม.</span>
+                                    </div>
+                                    <p class="text-[10px] text-gray-500 mt-1" id="claim-table-hours-hint">จากตารางสอน: 45 ชม.</p>
+                                    <span id="claim-display-total-hours" class="hidden">45 ชั่วโมง</span>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400 mb-1">รวมเป็นเงิน (บาท)</p>
+                                    <p class="text-lg font-bold text-[#10b981] mt-1" id="claim-display-total-money">1,890.00</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-2">
+                                <label class="block text-xs text-gray-400 mb-1">ตัวหนังสือจำนวนเงิน</label>
+                                <input type="text" id="claim-input-baht-text" class="w-full p-2 rounded-lg text-xs bg-[#141725] text-gray-300" readonly value="หนึ่งพันแปดร้อยเก้าสิบบาทถ้วน">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar Tab 2: ตาราง 18 สัปดาห์ -->
+                    <div id="claim-tab-calendar" class="claim-tab-content hidden space-y-3">
+                        <div class="flex justify-between items-center text-xs text-gray-400">
+                            <span id="claim-weeks-count-label">รายการสอน 18 สัปดาห์ (ติ๊กเพื่อตั้งเป็นวันหยุด)</span>
+                            <button id="btn-reset-weeks-default" class="text-xs text-blue-400 hover:underline">รีเซ็ตตามค่าเริ่มต้น</button>
+                        </div>
+                        <div id="claim-weeks-editor-list" class="space-y-2.5 pb-10">
+                            <!-- 18 weeks dynamically rendered -->
+                        </div>
+                    </div>
+
+                    <!-- Sidebar Tab 3: รายชื่อลายเซ็น -->
+                    <div id="claim-tab-signatures" class="claim-tab-content hidden space-y-3 text-xs">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-[#141725] rounded-xl border border-[#2d3748]">
+                            <div>
+                                <h4 class="font-bold text-white text-xs flex items-center gap-1.5">
+                                    <i class="fa-solid fa-signature text-orange-400"></i> รายชื่อผู้ลงนาม
+                                </h4>
+                                <p class="text-[11px] text-gray-400">กำหนดชื่อผู้ลงนามในใบเบิกเงิน</p>
+                            </div>
+                            <button type="button" id="btn-apply-all-signatures" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow transition cursor-pointer" title="นำชุดรายชื่อผู้ลงนามทั้งหมดในหน้านี้ (ข้อ 2-9) ไปใช้กับทุกวิชาในภาคเรียนนี้ โดยชื่อผู้เบิกจะดึงตามอาจารย์ผู้สอนของแต่ละวิชา">
+                                <i class="fa-solid fa-check-double"></i> นำไปใช้ทุกวิชา
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <label class="block text-gray-400 mb-1">1. ผู้ขอเบิก (อาจารย์ผู้สอน) <span class="text-[10px] text-blue-400 font-normal ml-1">*(ดึงอัตโนมัติตามอาจารย์ผู้สอนของแต่ละวิชา)</span></label>
+                            <input type="text" id="sig-teacher-name" class="w-full p-2 rounded-lg text-xs" value="นายณัฐวรรธน์ เกษกุล" autocomplete="off" placeholder="พิมพ์ชื่อผู้ขอเบิก...">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400" id="label-sig-program-chair">2. ประธานหลักสูตรสาขาวิชา</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="programChair" data-input-id="sig-program-chair" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-program-chair" class="w-full p-2 rounded-lg text-xs" value="นายปริวัฒน์ ยืนยิ่ง" autocomplete="off" placeholder="พิมพ์ชื่อประธานหลักสูตร...">
+                            <input type="text" id="sig-program-chair-role" class="w-full p-1.5 mt-1 rounded-lg text-[11px] bg-[#1a2030] text-blue-300 border border-gray-700/50" placeholder="ตำแหน่ง (เช่น ประธานหลักสูตรสาขาวิชาเทคโนโลยีไฟฟ้า)" title="แก้ไขชื่อตำแหน่งประธานหลักสูตร">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400">3. หัวหน้างานพัฒนาหลักสูตรสายเทคโนโลยีฯ</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="curriculumHead" data-input-id="sig-curriculum-head" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-curriculum-head" class="w-full p-2 rounded-lg text-xs" value="นายชนะ สุทธิประภา" autocomplete="off" placeholder="พิมพ์ชื่อหัวหน้างาน...">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400" id="label-sig-dept-head">4. หัวหน้าสาขาวิชา</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="deptHead" data-input-id="sig-dept-head" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-dept-head" class="w-full p-2 rounded-lg text-xs" value="นายปริวัฒน์ ยืนยิ่ง" autocomplete="off" placeholder="พิมพ์ชื่อหัวหน้าสาขา...">
+                            <input type="text" id="sig-dept-head-role" class="w-full p-1.5 mt-1 rounded-lg text-[11px] bg-[#1a2030] text-blue-300 border border-gray-700/50" placeholder="ตำแหน่ง (เช่น หัวหน้าสาขาวิชาเทคโนโลยีไฟฟ้า)" title="แก้ไขชื่อตำแหน่งหัวหน้าสาขา">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400">5. หัวหน้างานภาควิชาเทคโนโลยีบัณฑิต</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="techHead" data-input-id="sig-tech-head" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-tech-head" class="w-full p-2 rounded-lg text-xs" value="นายสถิระ กาญจันดา" autocomplete="off" placeholder="พิมพ์ชื่อหัวหน้างาน...">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400">6. รองผู้อำนวยการฝ่ายวิชาการ</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="academicDeputy" data-input-id="sig-academic-deputy" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-academic-deputy" class="w-full p-2 rounded-lg text-xs" value="นายสุวิชา มั่นยืน" autocomplete="off" placeholder="พิมพ์ชื่อรอง ผอ. ฝ่ายวิชาการ...">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400">7. หัวหน้าการเงิน</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="financeHead" data-input-id="sig-finance-head" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-finance-head" class="w-full p-2 rounded-lg text-xs" value="นางมลีทอง จารุพงษ์" autocomplete="off" placeholder="พิมพ์ชื่อหัวหน้าการเงิน...">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400">8. รองผู้อำนวยการฝ่ายบริหารทรัพยากร</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="resourceDeputy" data-input-id="sig-resource-deputy" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-resource-deputy" class="w-full p-2 rounded-lg text-xs" value="นางสาวสายฝน สาระผล" autocomplete="off" placeholder="พิมพ์ชื่อรอง ผอ. บริหาร...">
+                        </div>
+                        <div class="relative">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-gray-400">9. ผู้อำนวยการวิทยาลัยเทคนิคอุบลราชธานี</label>
+                                <button type="button" class="btn-apply-single-sig text-[10px] text-blue-300 hover:text-white bg-blue-900/40 hover:bg-blue-600 border border-blue-500/30 px-2 py-0.5 rounded transition cursor-pointer" data-field="director" data-input-id="sig-director" title="นำชื่อนี้ไปใช้กับทุกวิชาในภาคเรียนนี้">นำไปใช้ทุกวิชา</button>
+                            </div>
+                            <input type="text" id="sig-director" class="w-full p-2 rounded-lg text-xs" value="นายธาตรี พิบูลมณฑา" autocomplete="off" placeholder="พิมพ์ชื่อผู้อำนวยการ...">
+                        </div>
+                    </div>
+
+                    <!-- Sidebar Tab 4: รายชื่อนักศึกษา -->
+                    <div id="claim-tab-students" class="claim-tab-content hidden space-y-3">
+                        <div class="flex justify-between items-center gap-1.5 flex-wrap">
+                            <span class="text-xs text-gray-400">นักศึกษาในรายวิชานี้ (<span id="claim-student-count-badge">6</span> คน)</span>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="btn-import-students-claim" class="bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded text-xs flex items-center gap-1 transition">
+                                    <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์
+                                </button>
+                                <button id="btn-add-student-to-subject" class="btn-primary px-2.5 py-1 rounded text-xs flex items-center gap-1">
+                                    <i class="fa-solid fa-plus"></i> เพิ่ม นศ.
+                                </button>
+                            </div>
+                        </div>
+                        <div id="claim-students-editor-list" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                            <!-- Students list dynamically rendered -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Side: A4 Document Live Preview -->
+                <div id="claim-preview-container" class="flex-1 bg-[#0b0e17] p-4 lg:p-8 overflow-x-auto flex flex-col items-center min-w-0 w-full">
+                    
+                    <!-- Page Switcher Bar -->
+                    <div id="claim-page-switcher" class="w-full max-w-[210mm] flex flex-wrap justify-between items-center gap-2 mb-4 bg-[#1c2134] p-2 rounded-xl border border-[#2d3748]">
+                        <div class="flex gap-1">
+                            <button id="btn-page-1" class="page-tab-btn active bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition font-medium">
+                                <i class="fa-regular fa-file-lines"></i> หน้า 1: ใบเบิกเงินค่าตอบแทน
+                            </button>
+                            <button id="btn-page-2" class="page-tab-btn bg-[#141725] hover:bg-[#2d3748] text-gray-300 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+                                <i class="fa-regular fa-file-lines"></i> <span id="label-btn-page-2">หน้า 2: ใบตรวจสอบการเข้าเรียน (18 สัปดาห์)</span>
+                            </button>
+                            <button id="btn-page-all" class="page-tab-btn bg-[#141725] hover:bg-[#2d3748] text-gray-300 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+                                <i class="fa-regular fa-copy"></i> แสดงทั้ง 2 หน้า (สำหรับพิมพ์)
+                            </button>
+                        </div>
+                        <div class="text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            ตัวอย่างเอกสารจริง (TH Sarabun PSK)
+                        </div>
+                    </div>
+
+                    <!-- Live A4 Pages Wrapper -->
+                    <div id="a4-pages-wrapper" class="flex flex-col items-center w-full">
+                        
+                        <!-- Page 1: ใบเบิกเงินค่าตอบแทนภาคสมทบ -->
+                        <div id="doc-page-1" class="a4-paper">
+                            <!-- Rendered Live Page 1 -->
+                        </div>
+
+                        <!-- Page 2: ใบตรวจสอบการเข้าเรียนนักศึกษา (18 สัปดาห์) -->
+                        <div id="doc-page-2" class="a4-paper hidden">
+                            <!-- Rendered Live Page 2 -->
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal: Settings -->
+    <div id="modal-settings" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="p-5 border-b border-[#2d3748] flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-gear text-gray-400 mr-2"></i>ตั้งค่าระบบ (ฐานข้อมูล)</h3>
+                <button class="close-modal text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-5 flex-1 overflow-y-auto">
+                <div class="flex border-b border-[#2d3748] mb-4">
+                    <button class="tab-btn active px-4 py-2 text-blue-400 border-b-2 border-blue-500 font-medium" data-tab="tab-teachers">รายชื่ออาจารย์ (<span id="count-teachers">0</span>)</button>
+                    <button class="tab-btn px-4 py-2 text-gray-400 hover:text-gray-200 font-medium" data-tab="tab-subjects">รายวิชา Master (<span id="count-subjects">0</span>)</button>
+                    <button class="tab-btn px-4 py-2 text-gray-400 hover:text-gray-200 font-medium" data-tab="tab-students">รายชื่อนักศึกษา (<span id="count-students">0</span>)</button>
+                </div>
+                
+                <!-- Tab Content: Teachers -->
+                <div id="tab-teachers" class="tab-content">
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <input type="text" id="search-teacher" placeholder="🔍 ค้นหาชื่ออาจารย์..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm">
+                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 rounded-lg text-sm flex items-center gap-1.5 transition font-medium" data-category="teacher">
+                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ (PDF/Excel/รูป)
+                        </button>
+                        <button id="btn-open-add-teacher" class="btn-primary px-4 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                    </div>
+                    <ul id="list-teachers" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+                </div>
+
+                <!-- Tab Content: Subjects -->
+                <div id="tab-subjects" class="tab-content hidden">
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <input type="text" id="search-subject" placeholder="🔍 ค้นหารหัส หรือ ชื่อวิชา..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm">
+                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 rounded-lg text-sm flex items-center gap-1.5 transition font-medium" data-category="subject">
+                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ (PDF/Excel/รูป)
+                        </button>
+                        <button id="btn-open-add-subject" class="btn-primary px-4 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                    </div>
+                    <ul id="list-subjects" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+                </div>
+
+                <!-- Tab Content: Students -->
+                <div id="tab-students" class="tab-content hidden">
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <input type="text" id="search-student" placeholder="🔍 ค้นหารหัส หรือ ชื่อนักศึกษา..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm">
+                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 rounded-lg text-sm flex items-center gap-1.5 transition font-medium" data-category="student">
+                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ (PDF/Excel/รูป)
+                        </button>
+                        <button id="btn-open-add-student" class="btn-primary px-4 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                    </div>
+                    <ul id="list-students" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+                </div>
+            </div>
+            <div class="p-4 border-t border-[#2d3748] flex flex-col sm:flex-row justify-between items-center gap-3 bg-[#141725] rounded-b-xl">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <button type="button" id="btn-open-universal-import" class="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition font-medium">
+                        <i class="fa-solid fa-file-arrow-up text-sm"></i> นำเข้าข้อมูลจากไฟล์ในเครื่อง (PDF / Excel / รูปภาพ)
+                    </button>
+                    <button id="btn-sync-all-files" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> รีเซ็ตข้อมูลเริ่มต้น (สมุดโทรศัพท์ + รายวิชา ป.ตรี)
+                    </button>
+                </div>
+                <button class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-white px-5 py-2 rounded-lg text-sm w-full sm:w-auto">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Import from Computer File (PDF / Excel / Image) -->
+    <div id="modal-import-data" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-[#2d3748] flex justify-between items-center bg-[#141725] rounded-t-xl">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center">
+                        <i class="fa-solid fa-file-import text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">นำเข้าข้อมูลจากไฟล์ในเครื่องคอมพิวเตอร์</h3>
+                        <p class="text-xs text-gray-400">รองรับไฟล์ Excel (.xlsx, .xls, .csv), เอกสาร PDF (.pdf) และรูปภาพ (.png, .jpg)</p>
+                    </div>
+                </div>
+                <button class="close-modal text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 flex-1 overflow-y-auto space-y-4">
+                
+                <!-- Step 1: Select Category -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-2">1. เลือกประเภทข้อมูลที่ต้องการนำเข้า</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="import-type-card cursor-pointer border border-[#2d3748] bg-[#0f121d] hover:border-purple-500/50 p-2.5 rounded-lg flex items-center gap-2.5 transition">
+                            <input type="radio" name="import-category" value="teacher" class="text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <div class="text-xs font-bold text-white"><i class="fa-solid fa-chalkboard-user text-blue-400 mr-1"></i> อาจารย์</div>
+                                <div class="text-[10px] text-gray-400">รายชื่อผู้สอน</div>
+                            </div>
+                        </label>
+                        <label class="import-type-card cursor-pointer border border-[#2d3748] bg-[#0f121d] hover:border-purple-500/50 p-2.5 rounded-lg flex items-center gap-2.5 transition">
+                            <input type="radio" name="import-category" value="subject" class="text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <div class="text-xs font-bold text-white"><i class="fa-solid fa-book text-orange-400 mr-1"></i> รายวิชา</div>
+                                <div class="text-[10px] text-gray-400">รหัสวิชา, นก., ชม.</div>
+                            </div>
+                        </label>
+                        <label class="import-type-card cursor-pointer border border-purple-500 bg-purple-950/30 p-2.5 rounded-lg flex items-center gap-2.5 transition">
+                            <input type="radio" name="import-category" value="student" checked class="text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <div class="text-xs font-bold text-white"><i class="fa-solid fa-graduation-cap text-green-400 mr-1"></i> นักศึกษา</div>
+                                <div class="text-[10px] text-gray-400">รหัสนักศึกษา, ชื่อ-สกุล</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Step 2: Choose File Area -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-2">2. เลือกไฟล์จากเครื่องคอมพิวเตอร์</label>
+                    <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.webp" class="hidden">
+                    
+                    <div id="import-dropzone" class="border-2 border-dashed border-[#2d3748] hover:border-purple-400/80 bg-[#0f121d]/70 hover:bg-[#141725] rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
+                        <div class="w-12 h-12 rounded-full bg-purple-900/30 text-purple-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <div class="text-sm font-semibold text-gray-200">
+                            คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่
+                        </div>
+                        <p class="text-xs text-gray-400">
+                            รองรับไฟล์ <span class="text-emerald-400 font-medium">Excel (.xlsx, .xls, .csv)</span>, <span class="text-red-400 font-medium">PDF (.pdf)</span>, และ <span class="text-blue-400 font-medium">รูปภาพ (.png, .jpg)</span>
+                        </p>
+                        <div id="import-file-info" class="hidden mt-2 bg-[#1c2134] border border-purple-500/40 px-3 py-1.5 rounded-lg text-xs text-purple-300 flex items-center gap-2">
+                            <i class="fa-solid fa-file-circle-check"></i>
+                            <span id="import-file-name" class="font-semibold"></span>
+                            <span id="import-file-size" class="text-gray-400"></span>
+                        </div>
+                    </div>
+
+                    <!-- Progress / Status Indicator -->
+                    <div id="import-status-bar" class="hidden mt-2 p-2.5 rounded-lg bg-blue-950/40 border border-blue-500/30 text-xs text-blue-300 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch fa-spin text-blue-400"></i>
+                        <span id="import-status-text">กำลังประมวลผลไฟล์...</span>
+                    </div>
+                </div>
+
+                <!-- Step 3: Extracted Preview & Mode -->
+                <div id="import-preview-section" class="hidden space-y-2.5 pt-2 border-t border-[#2d3748]">
+                    <div class="flex flex-wrap justify-between items-center gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-white">ผลการดึงข้อมูล:</span>
+                            <span id="import-detected-badge" class="px-2 py-0.5 rounded text-[11px] bg-green-950/60 border border-green-500/40 text-green-300 font-semibold">พบ 0 รายการ</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-gray-300">
+                                <input type="radio" name="import-mode" value="append" checked class="text-purple-600 focus:ring-purple-500">
+                                <span>เพิ่มต่อท้าย (ไม่ซ้ำ)</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer text-gray-300">
+                                <input type="radio" name="import-mode" value="replace" class="text-purple-600 focus:ring-purple-500">
+                                <span class="text-amber-300">แทนที่ข้อมูลเดิมทั้งหมด</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Table Preview Container -->
+                    <div class="max-h-56 overflow-y-auto border border-[#2d3748] rounded-lg bg-[#0f121d]">
+                        <table class="w-full text-xs text-left" id="import-preview-table">
+                            <thead class="bg-[#141725] text-gray-300 border-b border-[#2d3748] sticky top-0">
+                                <tr>
+                                    <th class="p-2 w-10 text-center"><input type="checkbox" id="import-select-all" checked></th>
+                                    <th class="p-2 w-12 text-center">ลำดับ</th>
+                                    <th class="p-2" id="th-col-1">ข้อมูล 1</th>
+                                    <th class="p-2" id="th-col-2">ข้อมูล 2</th>
+                                    <th class="p-2 w-20 text-center" id="th-col-3">ข้อมูล 3</th>
+                                </tr>
+                            </thead>
+                            <tbody id="import-preview-tbody" class="divide-y divide-[#2d3748] text-gray-200">
+                                <!-- Rendered rows with checkboxes -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-[#2d3748] flex justify-between items-center bg-[#141725] rounded-b-xl">
+                <button type="button" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg text-xs transition">
+                    ยกเลิก
+                </button>
+                <button type="button" id="btn-confirm-import-data" disabled class="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium px-5 py-2 rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-purple-600/20 transition">
+                    <i class="fa-solid fa-file-circle-check"></i> <span id="label-confirm-import">ยืนยันนำเข้าข้อมูล (0 รายการ)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Term -->
+    <div id="modal-add-term" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-xl w-full max-w-md shadow-2xl">
+            <div class="p-5 border-b border-[#2d3748] flex justify-between items-center">
+                <h3 id="modal-term-title" class="text-lg font-bold text-white">เพิ่มภาคเรียนใหม่</h3>
+                <button class="close-modal text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">เทอม (เช่น 1, 2, 3)</label>
+                    <select id="input-term-no" class="w-full p-2 rounded-lg text-sm">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3 (ฤดูร้อน)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">ปีการศึกษา (เช่น 2568)</label>
+                    <input type="number" id="input-term-year" class="w-full p-2 rounded-lg text-sm" placeholder="2568" value="2568">
+                </div>
+            </div>
+            <div class="p-4 border-t border-[#2d3748] flex justify-end gap-2">
+                <button class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg text-sm">ยกเลิก</button>
+                <button id="btn-confirm-add-term" class="btn-primary px-4 py-2 rounded-lg text-sm">บันทึกภาคเรียน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Item -->
+    <div id="modal-edit-item" class="modal fixed inset-0 z-[60] items-center justify-center">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-xl w-full max-w-lg shadow-2xl">
+            <div class="p-5 border-b border-[#2d3748] flex justify-between items-center">
+                <h3 id="edit-modal-title" class="text-lg font-bold text-white">แก้ไขข้อมูล</h3>
+                <button class="close-modal text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="edit-modal-body" class="p-5 space-y-4">
+                <!-- Inputs will be injected here dynamically -->
+            </div>
+            <div class="p-4 border-t border-[#2d3748] flex justify-end gap-2">
+                <button class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg text-sm">ยกเลิก</button>
+                <button id="btn-confirm-edit" class="btn-primary px-4 py-2 rounded-lg text-sm">บันทึกการแก้ไข</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Subject to Term -->
+    <div id="modal-add-subject-term" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-xl w-full max-w-lg shadow-2xl">
+            <div class="p-5 border-b border-[#2d3748] flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white">เพิ่มรายวิชาในเทอม</h3>
+                <button class="close-modal text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <!-- Searchable Subject Input -->
+                <div class="relative">
+                    <label class="block text-sm text-gray-400 mb-1">
+                        รายวิชา <span class="text-xs text-blue-400 font-normal">(พิมพ์เพื่อค้นหา แล้วคลิกเลือก)</span>
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="input-search-sub" placeholder="🔍 พิมพ์รหัสวิชา หรือ ชื่อวิชา เช่น 27-40121, คอนกรีต..." class="w-full p-2.5 pr-8 rounded-lg text-sm bg-[#0f121d] border border-[#2d3748] focus:border-blue-500 text-white" autocomplete="off">
+                        <button type="button" id="btn-clear-sub" class="hidden absolute right-2.5 top-2.5 text-gray-500 hover:text-gray-300"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <input type="hidden" id="selected-sub-id" value="">
+                    <div id="sub-selected-badge" class="hidden mt-1.5 p-2 bg-blue-950/40 border border-blue-500/30 rounded-lg text-xs text-blue-300 flex items-center justify-between">
+                        <span id="sub-selected-text"></span>
+                        <span class="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">เลือกแล้ว</span>
+                    </div>
+                    <div id="dropdown-sub-list" class="hidden absolute left-0 right-0 top-full mt-1 bg-[#141725] border border-[#2d3748] rounded-xl max-h-52 overflow-y-auto z-50 shadow-2xl space-y-1 p-1">
+                    </div>
+                </div>
+
+                <div class="bg-[#141725] p-3 rounded-lg border border-[#2d3748] text-xs text-gray-400 space-y-1">
+                    <div class="flex items-center gap-1.5 text-blue-400 font-medium">
+                        <i class="fa-solid fa-circle-info"></i> ข้อมูลเพิ่มเติม
+                    </div>
+                    <p>เมื่อกดเพิ่มรายวิชา ระบบจะเพิ่มรายวิชาลงในภาคเรียนนี้และคำนวณชั่วโมงสอนจริงจากตารางให้อัตโนมัติ โดยสามารถคลิก "กรอกใบเบิก" เพื่อปรับแต่งตารางสอนและรายละเอียดเพิ่มเติมได้</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-[#2d3748] flex justify-end gap-2">
+                <button class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg text-sm">ยกเลิก</button>
+                <button id="btn-confirm-add-subject" class="btn-primary px-4 py-2 rounded-lg text-sm">เพิ่มรายวิชา</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Subject in Term -->
+    <div id="modal-edit-subject-term" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-xl w-full max-w-xl shadow-2xl">
+            <div class="p-5 border-b border-[#2d3748] flex justify-between items-center bg-[#141725] rounded-t-xl">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                        <i class="fa-solid fa-pen-to-square text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">แก้ไขข้อมูลรายวิชาในภาคเรียน</h3>
+                        <p class="text-xs text-gray-400" id="edit-term-sub-term-label">ภาคเรียนที่ 1/2568</p>
+                    </div>
+                </div>
+                <button class="close-modal text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#2d3748] transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                <input type="hidden" id="edit-term-sub-editing-id" value="">
+                
+                <!-- 1. Search & Select Subject from Master -->
+                <div class="relative">
+                    <label class="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-book-open text-blue-400"></i> เปลี่ยนรายวิชา (ค้นหาจากคลังหลักสูตร)
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="edit-term-sub-search" placeholder="🔍 พิมพ์เพื่อค้นหาและเปลี่ยนวิชา เช่น 27-40121, คอนกรีต..." class="w-full p-2.5 pr-8 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] focus:border-blue-500 text-white" autocomplete="off">
+                        <button type="button" id="btn-edit-clear-sub" class="hidden absolute right-2.5 top-2.5 text-gray-500 hover:text-gray-300"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <input type="hidden" id="edit-term-sub-master-id" value="">
+                    <div id="edit-term-dropdown-sub-list" class="hidden absolute left-0 right-0 top-full mt-1 bg-[#141725] border border-[#2d3748] rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl space-y-1 p-1">
+                    </div>
+                </div>
+
+                <!-- 2. Subject Code & Name (Editable) -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 mb-1">รหัสวิชา</label>
+                        <input type="text" id="edit-term-sub-code" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] font-mono text-blue-300 font-semibold" placeholder="เช่น 27-40121-2106">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-300 mb-1">ชื่อรายวิชา</label>
+                        <input type="text" id="edit-term-sub-name" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-medium" placeholder="เช่น การออกแบบโครงสร้างคอนกรีตเสริมเหล็ก">
+                    </div>
+                </div>
+
+                <!-- 3. Teacher Selection (with autocomplete) -->
+                <div class="relative">
+                    <label class="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chalkboard-user text-green-400"></i> อาจารย์ผู้สอน
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="edit-term-sub-teacher-name" placeholder="พิมพ์ค้นหาชื่ออาจารย์ผู้สอน..." class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white" autocomplete="off">
+                    </div>
+                    <input type="hidden" id="edit-term-sub-teacher-id" value="">
+                </div>
+
+                <!-- 4. Class Level & Time -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+                            <i class="fa-solid fa-layer-group text-purple-400"></i> ระดับชั้นปี
+                        </label>
+                        <input type="text" id="edit-term-sub-level" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white" placeholder="เช่น ชั้นปี 1 หรือ ทล.บ.1" value="ชั้นปี 1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+                            <i class="fa-regular fa-clock text-amber-400"></i> เวลาเรียน
+                        </label>
+                        <input type="text" id="edit-term-sub-time" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white" placeholder="เช่น 17.00-20.00" value="17.00-20.00">
+                    </div>
+                </div>
+
+                <!-- 5. Hours, Rate, Student count -->
+                <div class="grid grid-cols-3 gap-3 bg-[#141725] p-3 rounded-lg border border-[#2d3748]">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">ชม. สอนรวม</label>
+                        <input type="number" id="edit-term-sub-hours" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-mono" min="1" placeholder="54">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">อัตราเบิก (บ./ชม.)</label>
+                        <input type="number" id="edit-term-sub-rate" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-emerald-400 font-bold font-mono" min="1" placeholder="42">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">จำนวน นศ. (คน)</label>
+                        <input type="number" id="edit-term-sub-students" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-mono" min="1" placeholder="6">
+                    </div>
+                </div>
+
+                <!-- Calculation Summary Preview -->
+                <div class="p-3 bg-emerald-950/20 border border-emerald-500/30 rounded-lg flex justify-between items-center text-xs">
+                    <span class="text-gray-300">ประมาณการยอดเงินเบิก:</span>
+                    <span class="text-base font-bold text-emerald-400" id="edit-term-sub-total-money">0.00 บาท</span>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-[#2d3748] flex justify-between items-center bg-[#141725] rounded-b-xl">
+                <button type="button" id="btn-edit-goto-claim" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1.5 transition cursor-pointer">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดหน้ากรอกใบเบิกเต็มรูปแบบ
+                </button>
+                <div class="flex gap-2">
+                    <button class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-4 py-2 rounded-lg text-xs transition cursor-pointer">ยกเลิก</button>
+                    <button id="btn-save-edit-subject" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20 cursor-pointer">
+                        <i class="fa-solid fa-floppy-disk"></i> บันทึกการแก้ไข
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Grand Summary Claim (ใบเบิกรวม ตราครุฑ) -->
+    <div id="modal-summary-claim" class="modal fixed inset-0 z-50 overflow-hidden bg-[#0d111c] flex-col p-0 m-0">
+        <div class="bg-[#141725] w-full h-full flex flex-col overflow-hidden">
+            
+            <!-- Modal Header Bar -->
+            <div class="px-4 sm:px-6 py-3 border-b border-[#2d3748] flex flex-wrap justify-between items-center gap-3 bg-[#1c2134] flex-shrink-0 no-print">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center text-xl shadow-lg shadow-orange-500/10">
+                        <i class="fa-solid fa-file-invoice"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-bold text-white">ใบเบิกรวมค่าสอนระดับปริญญาตรี (แบบบันทึกข้อความ ตราครุฑ)</h3>
+                            <span id="summary-term-badge" class="px-2.5 py-0.5 rounded-full text-xs bg-orange-500/20 text-orange-300 font-semibold border border-orange-500/30">
+                                ภาคเรียนที่ 1/2568
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-0.5">แบบฟอร์มบันทึกข้อความขอเบิกเงินค่าสอน ป.ตรี สรุปทุกรายวิชา ตามแบบมาตรฐาน 2.บันทึกเบิกค่าสอน ป.ตรี (รวมรายวิชา)</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btn-print-summary-claim" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 transition cursor-pointer">
+                        <i class="fa-solid fa-print"></i> พิมพ์เอกสาร / บันทึก PDF (A4)
+                    </button>
+                    <button type="button" id="btn-close-summary-claim" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i> ปิด
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Main Content (Split Screen Full Screen) -->
+            <div class="flex flex-col lg:flex-row flex-1 overflow-hidden h-[calc(100vh-61px)]">
+                
+                <!-- Left Sidebar: Controls & Options (Scrollable) -->
+                <div class="w-full lg:w-[420px] xl:w-[460px] bg-[#1c2134] border-r border-[#2d3748] p-4 sm:p-5 flex flex-col gap-4 overflow-y-auto h-full flex-shrink-0 no-print">
+                    
+                    <!-- Section 1: Choose Subjects to include -->
+                    <div class="bg-[#141725] p-3.5 rounded-xl border border-[#2d3748] space-y-2.5">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-check"></i> 1. เลือกรายวิชาที่จะเบิกในใบนี้
+                            </h4>
+                            <div class="flex items-center gap-2 text-[11px]">
+                                <button type="button" id="btn-summary-select-all" class="text-blue-400 hover:text-blue-300">เลือกทั้งหมด</button>
+                                <span class="text-gray-600">|</span>
+                                <button type="button" id="btn-summary-deselect-all" class="text-gray-400 hover:text-gray-300">ยกเลิกทั้งหมด</button>
+                            </div>
+                        </div>
+                        
+                        <div id="summary-selected-count-badge" class="p-2 rounded-lg bg-orange-950/40 border border-orange-500/30 text-xs text-orange-300 flex justify-between items-center font-medium">
+                            <span>เลือก 0 รายวิชา</span>
+                            <span>ยอดรวม: 0.00 บาท</span>
+                        </div>
+
+                        <!-- Subjects Checkbox Container -->
+                        <div id="summary-subjects-selector-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Memorandum Header Details -->
+                    <div class="bg-[#141725] p-3.5 rounded-xl border border-[#2d3748] space-y-3 text-xs">
+                        <h4 class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-lines"></i> 2. ข้อมูลบันทึกข้อความ (หัวหนังสือ)
+                        </h4>
+
+                        <div>
+                            <label class="block text-[11px] text-gray-400 mb-1">ส่วนราชการ</label>
+                            <input type="text" id="summary-input-dept" class="w-full p-2 rounded-lg text-xs" value="สาขาวิชาโยธา  วิทยาลัยเทคนิคอุบลราชธานี">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1">ที่ (เลขที่หนังสือ)</label>
+                                <input type="text" id="summary-input-doc-no" class="w-full p-2 rounded-lg text-xs" placeholder="เว้นว่างหรือพิมพ์เลขที่">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1">วันที่ออกหนังสือ</label>
+                                <input type="text" id="summary-input-doc-date" class="w-full p-2 rounded-lg text-xs" placeholder="เว้นว่างหรือพิมพ์วันที่">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-gray-400 mb-1">เรื่อง</label>
+                            <input type="text" id="summary-input-subject-title" class="w-full p-2 rounded-lg text-xs" value="ขอเบิกค่าสอนระดับปริญญาตรี">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-gray-400 mb-1">เรียน</label>
+                            <input type="text" id="summary-input-recipient" class="w-full p-2 rounded-lg text-xs" value="ผู้อำนวยการวิทยาลัยเทคนิคอุบลราชธานี">
+                        </div>
+
+                        <div class="border-t border-[#2d3748] pt-2 space-y-2">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="relative">
+                                    <label class="block text-[11px] text-gray-400 mb-1">ชื่อผู้ขอเบิกเงิน</label>
+                                    <input type="text" id="summary-input-requester" class="w-full p-2 rounded-lg text-xs font-medium text-white" value="นายณัฐวรรธน์ เกษกุล" autocomplete="off" placeholder="พิมพ์ชื่อผู้ขอเบิก...">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">ตำแหน่ง</label>
+                                    <input type="text" id="summary-input-role" class="w-full p-2 rounded-lg text-xs" value="อาจารย์">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-2">
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] text-gray-400 mb-1">สาขาวิชา</label>
+                                    <input type="text" id="summary-input-dept-name" class="w-full p-2 rounded-lg text-xs" value="เทคโนโลยีโยธา">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">ชั้นปีที่</label>
+                                    <input type="text" id="summary-input-level" class="w-full p-2 rounded-lg text-xs text-center" value="1">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">ร้อยละที่ขอเบิก (%)</label>
+                                    <input type="number" id="summary-input-percent" class="w-full p-2 rounded-lg text-xs text-center" value="60">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-400 mb-1">ภาคเรียน / ปี</label>
+                                    <input type="text" id="summary-input-term-year" class="w-full p-2 rounded-lg text-xs text-center" value="1 / 2568">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1">ระหว่าง วันที่</label>
+                                <input type="text" id="summary-input-start-date" class="w-full p-2 rounded-lg text-xs" placeholder="2 มิถุนายน 2568" value="2 มิถุนายน 2568">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-400 mb-1">ถึง วันที่</label>
+                                <input type="text" id="summary-input-end-date" class="w-full p-2 rounded-lg text-xs" placeholder="4 ตุลาคม 2568" value="4 ตุลาคม 2568">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Signatures -->
+                    <div class="bg-[#141725] p-3.5 rounded-xl border border-[#2d3748] space-y-2.5 text-xs">
+                        <h4 class="text-xs font-bold text-green-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-signature"></i> 3. รายชื่อผู้ลงนาม (ลายเซ็นต์)
+                        </h4>
+
+                        <div class="relative">
+                            <label class="block text-[11px] text-gray-400 mb-0.5">1. ผู้ขอเบิก</label>
+                            <input type="text" id="summary-sig-requester" class="w-full p-2 rounded-lg text-xs" value="นายณัฐวรรธน์ เกษกุล" autocomplete="off" placeholder="พิมพ์ชื่อผู้ขอเบิก...">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[11px] text-gray-400 mb-0.5">2. หัวหน้าสาขาวิชา</label>
+                            <input type="text" id="summary-sig-dept-head" class="w-full p-2 rounded-lg text-xs" value="นายปริวัฒน์ ยืนยิ่ง" autocomplete="off" placeholder="พิมพ์ชื่อหัวหน้าสาขา...">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[11px] text-gray-400 mb-0.5">3. ผู้ตรวจสอบ (หัวหน้างานพัฒนาหลักสูตรฯ)</label>
+                            <input type="text" id="summary-sig-verifier" class="w-full p-2 rounded-lg text-xs" value="นายชนะ สุทธิประภา" autocomplete="off" placeholder="พิมพ์ชื่อผู้ตรวจสอบ...">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[11px] text-gray-400 mb-0.5">4. รองผู้อำนวยการฝ่ายวิชาการ</label>
+                            <input type="text" id="summary-sig-academic-deputy" class="w-full p-2 rounded-lg text-xs" value="นายสุวิชา มั่นยืน" autocomplete="off" placeholder="พิมพ์ชื่อรอง ผอ. ฝ่ายวิชาการ...">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[11px] text-gray-400 mb-0.5">5. รองผู้อำนวยการฝ่ายบริหารทรัพยากร</label>
+                            <input type="text" id="summary-sig-resource-deputy" class="w-full p-2 rounded-lg text-xs" value="นางสาวสายฝน สาระผล" autocomplete="off" placeholder="พิมพ์ชื่อรอง ผอ. บริหาร...">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[11px] text-gray-400 mb-0.5">6. ผู้อำนวยการวิทยาลัยเทคนิคอุบลราชธานี</label>
+                            <input type="text" id="summary-sig-director" class="w-full p-2 rounded-lg text-xs" value="นายธาตรี พิบูลมณฑา" autocomplete="off" placeholder="พิมพ์ชื่อผู้อำนวยการ...">
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Preview Panel: Live A4 Paper (Identical to 2.บันทึกเบิกค่าสอน ป.ตรี) -->
+                <div id="summary-claim-preview-container" class="flex-1 bg-[#08090f] p-4 sm:p-8 overflow-y-auto flex justify-center items-start h-full">
+                    <div id="summary-claim-paper" class="a4-paper relative shadow-2xl">
+                        <!-- Rendered in app.js -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal: Batch Print (สั่งพิมพ์เอกสารเลือกเทอม/รายวิชา/ใบเบิกรวม) -->
+    <div id="modal-batch-print" class="modal fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-[#1c2134] border border-[#2d3748] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-[#2d3748] flex justify-between items-center bg-[#181c2d]">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-print"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">สั่งพิมพ์เอกสาร</h3>
+                        <p class="text-xs text-gray-400">เลือกภาคเรียน/ปีการศึกษา และติ๊กเลือกรายวิชาหรือใบเบิกรวมที่ต้องการพิมพ์</p>
+                    </div>
+                </div>
+                <button type="button" class="close-modal text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#2d3748] transition cursor-pointer">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-6 overflow-y-auto space-y-5 flex-1 text-sm">
+                
+                <!-- Section 1: Semester Selector -->
+                <div class="bg-[#141725] p-4 rounded-xl border border-[#2d3748] space-y-2">
+                    <label class="block text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-days"></i> 1. เลือกภาคเรียน / ปีการศึกษา
+                    </label>
+                    <div class="relative">
+                        <select id="batch-print-term-select" class="w-full p-2.5 rounded-lg text-sm bg-[#0f121d] border border-[#2d3748] text-white focus:border-blue-500">
+                            <!-- Populated dynamically from appData.terms -->
+                        </select>
+                    </div>
+                    <div id="batch-print-term-info" class="text-xs text-gray-400 flex items-center justify-between pt-1">
+                        <span>มีทั้งหมด <strong id="batch-term-sub-count" class="text-white">0</strong> รายวิชา</span>
+                        <span id="batch-term-money-badge" class="text-emerald-400 font-medium">0.00 บาท</span>
+                    </div>
+                </div>
+
+                <!-- Section 2: Summary Claim Option -->
+                <div class="bg-[#141725] p-4 rounded-xl border border-[#2d3748] space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-invoice"></i> 2. ใบขออนุมัติเบิกจ่ายเงินค่าตอบแทนรวม (ใบเบิกรวม ตราครุฑ)
+                        </label>
+                        <span class="text-[11px] text-gray-400 bg-[#1c2134] px-2 py-0.5 rounded border border-[#2d3748]">1 แผ่น A4</span>
+                    </div>
+                    <label class="flex items-start gap-3 p-3 rounded-lg bg-[#1c2134]/60 border border-[#2d3748] hover:border-orange-500/50 cursor-pointer transition">
+                        <input type="checkbox" id="batch-print-check-summary" class="mt-1 w-4 h-4 rounded text-orange-500 focus:ring-orange-400 border-gray-600 bg-gray-700 cursor-pointer" checked>
+                        <div class="flex-1">
+                            <div class="font-medium text-white text-xs flex items-center gap-2">
+                                <span>พิมพ์ใบเบิกรวม (แบบบันทึกข้อความ ตราครุฑ + ตารางสรุปรายวิชา)</span>
+                                <span class="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded">แนะนำ</span>
+                            </div>
+                            <p class="text-[11px] text-gray-400 mt-0.5">รวมยอดเงินและรายชื่อผู้สอนทุกรายวิชาที่เลือกในเทอมนี้ ตามแบบมาตรฐานราชการ</p>
+                            <div id="batch-summary-dates-info" class="text-[11px] text-orange-300/90 mt-1 flex items-center gap-1.5">
+                                <i class="fa-regular fa-calendar-check text-orange-400"></i>
+                                <span id="batch-summary-dates-text">ช่วงวันที่เบิก: กำลังคำนวณ...</span>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Section 3: Subject Selection -->
+                <div class="bg-[#141725] p-4 rounded-xl border border-[#2d3748] space-y-3">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-book-open"></i> 3. เลือกรายวิชาที่ต้องการพิมพ์ (พิมพ์แยกตามวิชา)
+                        </label>
+                        <div class="flex items-center gap-2 text-xs">
+                            <button type="button" id="btn-batch-select-all" class="text-blue-400 hover:text-blue-300 font-medium cursor-pointer">เลือกทั้งหมด</button>
+                            <span class="text-gray-600">|</span>
+                            <button type="button" id="btn-batch-deselect-all" class="text-gray-400 hover:text-gray-300 cursor-pointer">ยกเลิกทั้งหมด</button>
+                        </div>
+                    </div>
+
+                    <!-- Page selection preset for subjects -->
+                    <div class="flex items-center gap-4 px-3 py-2 rounded-lg bg-[#1c2134]/50 border border-[#2d3748] text-xs text-gray-300">
+                        <span class="text-gray-400 font-medium">หน้าที่พิมพ์สำหรับแต่ละวิชา:</span>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="batch-print-page1-all" class="rounded text-blue-500" checked>
+                            <span>หน้า 1 (ใบเบิกเงิน)</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="batch-print-page2-all" class="rounded text-blue-500" checked>
+                            <span>หน้า 2 (ใบตรวจเวลาเรียน)</span>
+                        </label>
+                    </div>
+
+                    <!-- Subjects Checkbox List -->
+                    <div id="batch-subjects-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-[#2d3748] bg-[#181c2d] flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div id="batch-print-summary-badge" class="text-xs text-gray-300 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                    <span>เลือกพิมพ์: <strong class="text-white" id="batch-print-total-pages-text">0 หน้า</strong></span>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button type="button" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-4 py-2 rounded-xl text-xs transition cursor-pointer">
+                        ปิด
+                    </button>
+                    <button type="button" id="btn-batch-print-execute" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 transition cursor-pointer">
+                        <i class="fa-solid fa-print"></i> สั่งพิมพ์เอกสารที่เลือก
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal: Cloud Sync Status & Actions -->
+    <div id="modal-cloud-sync" class="modal fixed inset-0 bg-black/75 z-50 hidden flex items-center justify-center p-4">
+        <div class="card-gradient w-full max-w-md rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden animate-in">
+            <div class="px-6 py-4 border-b border-[#2d3748] flex justify-between items-center bg-[#1c2134]">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                        <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">ระบบซิงค์ข้อมูล Cloudflare</h3>
+                        <p class="text-xs text-gray-400">ซิงค์ข้อมูลภาคเรียนและรายวิชาอัตโนมัติ</p>
+                    </div>
+                </div>
+                <button type="button" class="close-modal text-gray-400 hover:text-white text-lg cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <!-- Status Box -->
+                <div id="cloud-sync-status-box" class="p-4 rounded-xl bg-[#141725] border border-[#2d3748] space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-400">สถานะการเชื่อมต่อ:</span>
+                        <span id="cloud-status-badge" class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> พร้อมใช้งาน
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-gray-400">
+                        <span>ซิงค์ล่าสุด:</span>
+                        <span id="cloud-last-sync-text" class="text-gray-200 font-medium">-</span>
+                    </div>
+                </div>
+
+                <!-- Info Note -->
+                <div id="cloud-sync-help" class="text-xs text-gray-400 bg-blue-950/30 border border-blue-800/40 p-3 rounded-lg leading-relaxed">
+                    <i class="fa-solid fa-circle-info text-blue-400 mr-1"></i>
+                    ระบบจะบันทึกและซิงค์ข้อมูลขึ้น Cloudflare KV อัตโนมัติทุกครั้งที่มีการแก้ไข ทำให้เปิดใช้งานอุปกรณ์ไหนก็มีข้อมูลตรงกันเสมอ
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="space-y-2 pt-2">
+                    <button type="button" id="btn-cloud-sync-now" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition cursor-pointer">
+                        <i class="fa-solid fa-rotate"></i> ซิงค์ข้อมูลกับคลาวด์เดี๋ยวนี้
+                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="btn-cloud-pull-force" class="bg-[#242b3d] hover:bg-[#2d3748] text-gray-300 hover:text-white py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#3f4b61] transition cursor-pointer" title="ดึงข้อมูลล่าสุดจากคลาวด์มาทับในเครื่องนี้">
+                            <i class="fa-solid fa-cloud-arrow-down text-blue-400"></i> ดึงจากคลาวด์
+                        </button>
+                        <button type="button" id="btn-cloud-push-force" class="bg-[#242b3d] hover:bg-[#2d3748] text-gray-300 hover:text-white py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#3f4b61] transition cursor-pointer" title="ส่งข้อมูลในเครื่องนี้ขึ้นไปทับบนคลาวด์">
+                            <i class="fa-solid fa-cloud-arrow-up text-indigo-400"></i> ส่งขึ้นคลาวด์
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-3 border-t border-[#2d3748] bg-[#181c2d] flex justify-end">
+                <button type="button" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-4 py-1.5 rounded-lg text-xs transition cursor-pointer">
+                    ปิด
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Batch Print Container (Used strictly during batch printing) -->
+    <div id="batch-print-container" class="no-screen"></div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

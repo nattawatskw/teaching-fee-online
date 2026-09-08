@@ -1,0 +1,110 @@
+﻿export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    // API: Cloud Sync
+    if (url.pathname === '/api/sync') {
+      const corsHeaders = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      };
+
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      const kv = env.TEACHING_FEE_KV || env.KV || env.teaching_fee_kv || null;
+
+      if (!kv) {
+        return new Response(JSON.stringify({
+          success: false,
+          setupRequired: true,
+          message: 'ยังไม่ได้ผูก KV Namespace ชื่อ TEACHING_FEE_KV ในหน้าตั้งค่า Cloudflare'
+        }), {
+          status: 200,
+          headers: corsHeaders
+        });
+      }
+
+      try {
+        if (request.method === 'GET') {
+          const { value, metadata } = await kv.getWithMetadata('teaching_fee_app_data', 'text');
+          if (!value) {
+            return new Response(JSON.stringify({
+              success: true,
+              data: null,
+              updatedAt: null,
+              message: 'ยังไม่มีข้อมูลบนคลาวด์'
+            }), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          const parsed = JSON.parse(value);
+          return new Response(JSON.stringify({
+            success: true,
+            data: parsed,
+            updatedAt: metadata?.updatedAt || parsed.lastModified || null
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        }
+
+        if (request.method === 'POST') {
+          const body = await request.json();
+          const dataToSave = body.data || body;
+          const updatedAt = body.updatedAt || new Date().toISOString();
+
+          if (!dataToSave || typeof dataToSave !== 'object') {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'รูปแบบข้อมูลไม่ถูกต้อง'
+            }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          dataToSave.lastModified = updatedAt;
+
+          await kv.put('teaching_fee_app_data', JSON.stringify(dataToSave), {
+            metadata: { updatedAt }
+          });
+
+          return new Response(JSON.stringify({
+            success: true,
+            updatedAt: updatedAt,
+            message: 'บันทึกข้อมูลขึ้นคลาวด์เรียบร้อยแล้ว'
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        }
+
+        return new Response(JSON.stringify({ success: false, message: 'Method not allowed' }), {
+          status: 405,
+          headers: corsHeaders
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: err.message
+        }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+    }
+
+    // Default: Serve static assets
+    if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+      return env.ASSETS.fetch(request);
+    }
+
+    return new Response('Not Found', { status: 404 });
+  }
+};
