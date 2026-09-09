@@ -6584,6 +6584,9 @@ function renderSubjectsView() {
                         <span class="bg-blue-900/30 text-blue-400 border border-blue-500/30 text-xs px-2 py-1 rounded-full font-mono">
                             # ${masterSub.code}
                         </span>
+                        <span class="bg-blue-950/60 text-blue-300 border border-blue-500/30 text-xs px-2 py-1 rounded-full font-bold">
+                            ${(sub.credits !== undefined && sub.credits !== null && !isNaN(sub.credits)) ? sub.credits : ((masterSub.credits !== undefined && masterSub.credits !== null && !isNaN(masterSub.credits)) ? masterSub.credits : 3)} นก.
+                        </span>
                         ${!isSubjectIncludedInRateCalc(term, sub) ? `
                         <span class="bg-amber-950/40 text-amber-400 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" title="วิชานี้ไม่ถูกนำมาคิด ชม. ในการคำนวณอัตราเบิก">
                             <i class="fa-solid fa-ban text-[9px]"></i> ไม่คิด ชม. ในอัตราเบิก
@@ -6717,10 +6720,11 @@ function initTermSubjectAutocomplete() {
             matches.forEach(s => {
                 const item = document.createElement('div');
                 item.className = 'p-2.5 hover:bg-blue-600/20 hover:text-blue-200 rounded-lg cursor-pointer transition text-sm flex justify-between items-center border-b border-[#2d3748]/50 last:border-0';
+                const subCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
                 item.innerHTML = `
                     <div>
                         <div class="font-medium text-white">[${s.code}] ${s.name}</div>
-                        <div class="text-xs text-gray-400">หน่วยกิต: ${s.credits || 3} | ท${s.theoryHours !== undefined ? s.theoryHours : 3}-ป${s.practiceHours !== undefined ? s.practiceHours : 0}-รวม${s.hours || 3} ชม./สัปดาห์</div>
+                        <div class="text-xs text-gray-400">หน่วยกิต: ${subCred} | ท${s.theoryHours !== undefined ? s.theoryHours : 3}-ป${s.practiceHours !== undefined ? s.practiceHours : 0}-รวม${s.hours || 3} ชม./สัปดาห์</div>
                     </div>
                     <span class="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded ml-2 whitespace-nowrap">เลือก</span>
                 `;
@@ -6737,7 +6741,8 @@ function initTermSubjectAutocomplete() {
     function selectSubject(s) {
         selectedSubId.value = s.id;
         inputSub.value = `[${s.code}] ${s.name}`;
-        subBadgeText.textContent = `[${s.code}] ${s.name} (${s.credits || 3} นก. / ${s.hours || 3} ชม.)`;
+        const subCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
+        subBadgeText.textContent = `[${s.code}] ${s.name} (${subCred} นก. / ${s.hours || 3} ชม.)`;
         subBadge.classList.remove('hidden');
         btnClearSub.classList.remove('hidden');
         dropSub.classList.add('hidden');
@@ -6829,6 +6834,7 @@ function handleAddSubject() {
         id: generateId(),
         subjectId,
         teacherId: '',
+        credits: (masterSub.credits !== undefined && masterSub.credits !== null && !isNaN(masterSub.credits)) ? masterSub.credits : 3,
         level,
         time,
         studentCount,
@@ -6918,7 +6924,14 @@ function openEditSubjectModal(sub) {
     if (rateInput) rateInput.value = sub.rate || term.hourlyRate || 42;
     if (studentsInput) studentsInput.value = sub.studentCount || (appData.students ? appData.students.length : 6);
     const creditsInput = document.getElementById('edit-term-sub-credits');
-    if (creditsInput) creditsInput.value = sub.credits !== undefined ? sub.credits : (masterSub.credits !== undefined ? masterSub.credits : (sub.claimData?.credits || 3));
+    if (creditsInput) {
+        const curCred = (sub.credits !== undefined && sub.credits !== null && !isNaN(sub.credits)) 
+            ? sub.credits 
+            : ((masterSub.credits !== undefined && masterSub.credits !== null && !isNaN(masterSub.credits)) 
+                ? masterSub.credits 
+                : ((sub.claimData?.credits !== undefined && sub.claimData?.credits !== null) ? sub.claimData.credits : 3));
+        creditsInput.value = curCred;
+    }
 
     const updateMoney = () => {
         const h = parseFloat(hoursInput?.value) || 0;
@@ -6957,7 +6970,10 @@ function saveEditSubjectModal() {
     const rate = parseFloat(document.getElementById('edit-term-sub-rate').value) || sub.rate || 42;
     const studentCount = parseInt(document.getElementById('edit-term-sub-students').value, 10) || sub.studentCount || 6;
     const creditsInput = document.getElementById('edit-term-sub-credits');
-    const credits = creditsInput ? (parseInt(creditsInput.value, 10) || 3) : (sub.credits || 3);
+    const rawCr = creditsInput ? creditsInput.value : '';
+    const credits = (rawCr !== '' && !isNaN(parseInt(rawCr, 10))) 
+        ? parseInt(rawCr, 10) 
+        : ((sub.credits !== undefined && sub.credits !== null) ? sub.credits : 3);
 
     if (!newCode && !newName) {
         alert('กรุณาระบุรหัสวิชาหรือชื่อรายวิชา');
@@ -7053,10 +7069,11 @@ function initEditSubjectModalLogic() {
             matches.forEach(s => {
                 const item = document.createElement('div');
                 item.className = 'p-2.5 hover:bg-blue-600/20 hover:text-blue-200 rounded-lg cursor-pointer transition text-xs flex justify-between items-center border-b border-[#2d3748]/50 last:border-0';
+                const sCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
                 item.innerHTML = `
                     <div>
                         <div class="font-medium text-white">[${s.code}] ${s.name}</div>
-                        <div class="text-[11px] text-gray-400">หน่วยกิต: ${s.credits || 3} | ${s.hours || 3} ชม./สัปดาห์</div>
+                        <div class="text-[11px] text-gray-400">หน่วยกิต: ${sCred} | ${s.hours || 3} ชม./สัปดาห์</div>
                     </div>
                     <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded ml-2 whitespace-nowrap">เลือก</span>
                 `;
@@ -7067,7 +7084,7 @@ function initEditSubjectModalLogic() {
                     nameInput.value = s.name;
                     searchInput.value = `[${s.code}] ${s.name}`;
                     const editTermCred = document.getElementById('edit-term-sub-credits');
-                    if (editTermCred && s.credits !== undefined) {
+                    if (editTermCred && s.credits !== undefined && s.credits !== null) {
                         editTermCred.value = s.credits;
                     }
                     if (s.hours) {
@@ -7850,7 +7867,10 @@ function initSettingsCRUD() {
         } else if (currentEditingType === 'subject') {
             const code = document.getElementById('edit-sub-code').value.trim();
             const name = document.getElementById('edit-sub-name').value.trim();
-            const credits = parseInt(document.getElementById('edit-sub-credits').value) || 3;
+            const rawCredits = document.getElementById('edit-sub-credits')?.value;
+            const credits = (rawCredits !== undefined && rawCredits !== '' && !isNaN(parseInt(rawCredits, 10))) 
+                ? parseInt(rawCredits, 10) 
+                : 3;
             const theoryHours = parseFloat(document.getElementById('edit-sub-theory').value) || 0;
             const practiceHours = parseFloat(document.getElementById('edit-sub-practice').value) || 0;
             const selfHours = parseFloat(document.getElementById('edit-sub-self').value) || 0;
@@ -7878,6 +7898,53 @@ function initSettingsCRUD() {
                 currentEditingItem.practiceHours = practiceHours;
                 currentEditingItem.selfHours = selfHours;
                 currentEditingItem.hours = hours;
+
+                // Sync directly in appData.subjects_master array
+                const masterIdx = (appData.subjects_master || []).findIndex(x => x.id === currentEditingItem.id || (x.code && x.code === currentEditingItem.code));
+                if (masterIdx !== -1) {
+                    Object.assign(appData.subjects_master[masterIdx], {
+                        code, name, credits, theoryHours, practiceHours, selfHours, hours
+                    });
+                }
+
+                // Cascade update to all terms in appData.terms
+                (appData.terms || []).forEach(term => {
+                    (term.subjects || []).forEach(sub => {
+                        if (sub.subjectId === currentEditingItem.id || sub.code === currentEditingItem.code || sub.name === currentEditingItem.name) {
+                            sub.code = code;
+                            sub.name = name;
+                            sub.credits = credits;
+                            sub.theoryHours = theoryHours;
+                            sub.practiceHours = practiceHours;
+                            sub.selfHours = selfHours;
+                            sub.hours = hours;
+                            if (sub.claimData) {
+                                sub.claimData.subjectCode = code;
+                                sub.claimData.subjectName = name;
+                                sub.claimData.credits = credits;
+                                sub.claimData.theoryHours = theoryHours;
+                                sub.claimData.practiceHours = practiceHours;
+                                sub.claimData.weeklyHours = hours;
+                            }
+                        }
+                    });
+                });
+
+                // Update activeClaim and activeSubjectRef if currently open
+                if (typeof activeClaim !== 'undefined' && activeClaim && (activeClaim.subjectCode === currentEditingItem.code || activeClaim.subjectName === currentEditingItem.name || activeSubjectRef?.subjectId === currentEditingItem.id)) {
+                    activeClaim.subjectCode = code;
+                    activeClaim.subjectName = name;
+                    activeClaim.credits = credits;
+                    activeClaim.theoryHours = theoryHours;
+                    activeClaim.practiceHours = practiceHours;
+                    activeClaim.weeklyHours = hours;
+                    const elClaimCred = document.getElementById('claim-input-credits');
+                    if (elClaimCred) elClaimCred.value = credits;
+                }
+                if (typeof activeSubjectRef !== 'undefined' && activeSubjectRef && (activeSubjectRef.id === currentEditingItem.id || activeSubjectRef.subjectId === currentEditingItem.id)) {
+                    activeSubjectRef.credits = credits;
+                    if (activeSubjectRef.claimData) activeSubjectRef.claimData.credits = credits;
+                }
             }
             
         } else if (currentEditingType === 'student') {
@@ -7926,7 +7993,7 @@ function openEditModal(type, item) {
             </div>
         `;
     } else if (type === 'subject') {
-        const creditsVal = isNew ? 3 : (item.credits !== undefined ? item.credits : 3);
+        const creditsVal = isNew ? 3 : ((item.credits !== undefined && item.credits !== null && !isNaN(item.credits)) ? item.credits : 3);
         const theoryVal = isNew ? 2 : (item.theoryHours !== undefined ? item.theoryHours : 2);
         const practiceVal = isNew ? 2 : (item.practiceHours !== undefined ? item.practiceHours : 0);
         const defaultSelf = Math.max(0, creditsVal * 3 - theoryVal - practiceVal);
@@ -8206,7 +8273,8 @@ function renderSettingsLists() {
         const isSelected = selectedSubjectSettingsIds.has(s.id);
         const th = s.theoryHours !== undefined ? s.theoryHours : 0;
         const pr = s.practiceHours !== undefined ? s.practiceHours : 0;
-        const se = s.selfHours !== undefined ? s.selfHours : Math.max(0, (s.credits || 3) * 3 - th - pr);
+        const credVal = (s.credits !== undefined && s.credits !== null && !isNaN(s.credits)) ? s.credits : 3;
+        const se = s.selfHours !== undefined ? s.selfHours : Math.max(0, credVal * 3 - th - pr);
         const hrs = s.hours || (th + pr);
         
         let text = `<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 flex-1 pr-2">
@@ -8216,7 +8284,7 @@ function renderSettingsLists() {
             </div>
             <div class="flex items-center gap-1.5 flex-shrink-0">
                 <span class="text-[11px] bg-blue-950/60 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30 font-bold whitespace-nowrap">
-                    ${s.credits !== undefined ? s.credits : 3} นก.
+                    ${credVal} นก.
                 </span>
                 <span class="text-[11px] bg-orange-950/60 text-orange-300 px-2 py-0.5 rounded border border-orange-500/30 font-medium whitespace-nowrap">
                     ท-ป-ศ: ${th}-${pr}-${se}
@@ -9145,7 +9213,7 @@ function createInitialSubjectClaimData(term, masterSub, teacher = null) {
     c.academicYear = termYearFull;
     c.subjectCode = masterSub.code || c.subjectCode;
     c.subjectName = masterSub.name || c.subjectName;
-    c.credits = masterSub.credits || 3;
+    c.credits = (masterSub.credits !== undefined && masterSub.credits !== null && !isNaN(masterSub.credits)) ? masterSub.credits : 3;
     
     const th = masterSub.theoryHours !== undefined ? masterSub.theoryHours : 3;
     const pr = masterSub.practiceHours !== undefined ? masterSub.practiceHours : 0;
@@ -9344,7 +9412,8 @@ function initClaimSubjectPresetDropdown() {
         const th = s.theoryHours !== undefined ? s.theoryHours : 3;
         const pr = s.practiceHours !== undefined ? s.practiceHours : 0;
         const tot = s.hours || (th + pr);
-        opt.textContent = `[${s.code}] ${s.name} (${s.credits || 3} นก. / ท${th}-ป${pr}-รวม${tot} ชม.)`;
+        const sCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
+        opt.textContent = `[${s.code}] ${s.name} (${sCred} นก. / ท${th}-ป${pr}-รวม${tot} ชม.)`;
         sel.appendChild(opt);
     });
 
@@ -9356,10 +9425,11 @@ function initClaimSubjectPresetDropdown() {
             const th = found.theoryHours !== undefined ? found.theoryHours : 3;
             const pr = found.practiceHours !== undefined ? found.practiceHours : 0;
             const tot = found.hours || (th + pr);
+            const foundCred = (found.credits !== undefined && found.credits !== null) ? found.credits : 3;
 
             document.getElementById('claim-input-code').value = found.code;
             document.getElementById('claim-input-name').value = found.name;
-            document.getElementById('claim-input-credits').value = found.credits || 3;
+            document.getElementById('claim-input-credits').value = foundCred;
             
             const elTh = document.getElementById('claim-input-theory-hours');
             if (elTh) elTh.value = th;
@@ -9370,7 +9440,7 @@ function initClaimSubjectPresetDropdown() {
 
             activeClaim.subjectCode = found.code;
             activeClaim.subjectName = found.name;
-            activeClaim.credits = found.credits || 3;
+            activeClaim.credits = foundCred;
             activeClaim.theoryHours = th;
             activeClaim.practiceHours = pr;
             activeClaim.weeklyHours = tot;
@@ -9642,7 +9712,7 @@ function populateSidebarFromClaimData() {
 
     document.getElementById('claim-input-code').value = activeClaim.subjectCode || '';
     document.getElementById('claim-input-name').value = activeClaim.subjectName || '';
-    document.getElementById('claim-input-credits').value = activeClaim.credits || 3;
+    document.getElementById('claim-input-credits').value = (activeClaim.credits !== undefined && activeClaim.credits !== null && !isNaN(activeClaim.credits)) ? activeClaim.credits : 3;
     
     const masterSub = (appData.subjects_master || []).find(s => s.id === activeSubjectRef?.subjectId || s.code === activeClaim.subjectCode || s.name === activeClaim.subjectName);
     let defaultTh = 3, defaultPr = 0;
@@ -10908,7 +10978,7 @@ function generateA4Page1HTML(claim = activeClaim) {
                 ระหว่างวันที่ ${formatThaiDateFull(claim.startDate)} ถึง วันที่ ${claim.endDateThai || ''}
             </div>
             <div style="font-size: 14pt; margin-bottom: 10px;">
-                รหัสวิชา ${claim.subjectCode}&nbsp;&nbsp;&nbsp;&nbsp;ชื่อวิชา ${claim.subjectName}&nbsp;&nbsp;&nbsp;&nbsp;เวลาเรียน ${weeklyHoursPlan} ชม.&nbsp;&nbsp;&nbsp;&nbsp;จำนวน ${claim.credits || 3} หน่วยกิต
+                รหัสวิชา ${claim.subjectCode}&nbsp;&nbsp;&nbsp;&nbsp;ชื่อวิชา ${claim.subjectName}&nbsp;&nbsp;&nbsp;&nbsp;เวลาเรียน ${weeklyHoursPlan} ชม.&nbsp;&nbsp;&nbsp;&nbsp;จำนวน ${(claim.credits !== undefined && claim.credits !== null && !isNaN(claim.credits)) ? claim.credits : 3} หน่วยกิต
             </div>
 
             <!-- 18 Weeks Split Table -->
@@ -11459,11 +11529,16 @@ function setupClaimEventListeners() {
     });
 
     bindLiveInput('claim-input-credits', 'credits', () => {
-        const cr = parseInt(document.getElementById('claim-input-credits').value, 10) || 3;
+        const rawCr = document.getElementById('claim-input-credits')?.value;
+        const cr = (rawCr !== undefined && rawCr !== '' && !isNaN(parseInt(rawCr, 10))) ? parseInt(rawCr, 10) : 3;
         activeClaim.credits = cr;
         if (activeSubjectRef) {
             activeSubjectRef.credits = cr;
             if (activeSubjectRef.claimData) activeSubjectRef.claimData.credits = cr;
+            if (activeSubjectRef.subjectId) {
+                const mSub = (appData.subjects_master || []).find(s => s.id === activeSubjectRef.subjectId || s.code === activeClaim.subjectCode);
+                if (mSub) mSub.credits = cr;
+            }
         }
         renderA4Page1();
         saveData();
@@ -12100,9 +12175,10 @@ function initUniversalClaimAutocompletes() {
                     primary: s.name,
                     secondary: s.code
                 }));
+                const sCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
                 return sorted.map(s => ({
                     title: s.name,
-                    subtitle: `รหัส ${s.code} • ${s.credits || 3} นก. • ${s.hours || 3} ชม.`,
+                    subtitle: `รหัส ${s.code} • ${sCred} นก. • ${s.hours || 3} ชม.`,
                     value: s.name,
                     raw: s
                 }));
@@ -12117,9 +12193,10 @@ function initUniversalClaimAutocompletes() {
                     activeClaim.subjectCode = s.code;
                 }
                 const elCredits = document.getElementById('claim-input-credits');
-                if (elCredits && s.credits) {
-                    elCredits.value = s.credits;
-                    activeClaim.credits = s.credits;
+                const sCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
+                if (elCredits) {
+                    elCredits.value = sCred;
+                    activeClaim.credits = sCred;
                 }
                 const thHrs = s.theoryHours !== undefined ? s.theoryHours : 3;
                 const prHrs = s.practiceHours !== undefined ? s.practiceHours : 0;
@@ -12152,7 +12229,7 @@ function initUniversalClaimAutocompletes() {
                 if (activeSubjectRef) {
                     activeSubjectRef.name = s.name;
                     if (s.code) activeSubjectRef.code = s.code;
-                    if (s.credits) activeSubjectRef.credits = s.credits;
+                    activeSubjectRef.credits = sCred;
                     saveData();
                 }
                 updateCalculationsAndPreview();
@@ -12172,9 +12249,10 @@ function initUniversalClaimAutocompletes() {
                     primary: s.code,
                     secondary: s.name
                 }));
+                const sCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
                 return sorted.map(s => ({
                     title: s.code,
-                    subtitle: `${s.name} (${s.credits || 3} นก.)`,
+                    subtitle: `${s.name} (${sCred} นก.)`,
                     value: s.code,
                     raw: s
                 }));
@@ -12189,9 +12267,10 @@ function initUniversalClaimAutocompletes() {
                     activeClaim.subjectName = s.name;
                 }
                 const elCredits = document.getElementById('claim-input-credits');
-                if (elCredits && s.credits) {
-                    elCredits.value = s.credits;
-                    activeClaim.credits = s.credits;
+                const sCred = (s.credits !== undefined && s.credits !== null) ? s.credits : 3;
+                if (elCredits) {
+                    elCredits.value = sCred;
+                    activeClaim.credits = sCred;
                 }
                 const thHrs = s.theoryHours !== undefined ? s.theoryHours : 3;
                 const prHrs = s.practiceHours !== undefined ? s.practiceHours : 0;
@@ -12224,7 +12303,7 @@ function initUniversalClaimAutocompletes() {
                 if (activeSubjectRef) {
                     if (s.name) activeSubjectRef.name = s.name;
                     activeSubjectRef.code = s.code;
-                    if (s.credits) activeSubjectRef.credits = s.credits;
+                    activeSubjectRef.credits = sCred;
                     saveData();
                 }
                 updateCalculationsAndPreview();
@@ -13478,7 +13557,11 @@ function getSubjectClaimSummary(sub) {
     let subjectCode = masterSub.code || sub.code || '';
     let subjectName = masterSub.name || sub.name || '';
     let teacherName = teacher.name || '';
-    let credits = sub.credits || masterSub.credits || 3;
+    let credits = (sub.credits !== undefined && sub.credits !== null && sub.credits !== '')
+        ? parseInt(sub.credits, 10)
+        : ((masterSub.credits !== undefined && masterSub.credits !== null && masterSub.credits !== '')
+            ? parseInt(masterSub.credits, 10)
+            : 3);
     let students = sub.studentCount || 6;
     const term = appData.terms.find(t => t.id === currentTermId);
     let rate = sub.rate || (term && term.hourlyRate) || 42;
@@ -13488,7 +13571,10 @@ function getSubjectClaimSummary(sub) {
         if (sub.claimData.subjectCode) subjectCode = sub.claimData.subjectCode;
         if (sub.claimData.subjectName) subjectName = sub.claimData.subjectName;
         if (sub.claimData.teacherName) teacherName = sub.claimData.teacherName;
-        if (sub.claimData.credits) credits = parseInt(sub.claimData.credits) || credits;
+        if (sub.claimData.credits !== undefined && sub.claimData.credits !== null && sub.claimData.credits !== '') {
+            const parsedC = parseInt(sub.claimData.credits, 10);
+            if (!isNaN(parsedC)) credits = parsedC;
+        }
         if (sub.claimData.rate) rate = parseFloat(sub.claimData.rate) || rate;
         if (sub.claimData.students && sub.claimData.students.length > 0) {
             students = sub.claimData.students.length;
