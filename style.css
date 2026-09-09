@@ -60,10 +60,16 @@ body {
 }
 
 .view {
-  display: none;
+  display: none !important;
 }
 .view.active {
-  display: block;
+  display: block !important;
+}
+#view-login.view.active {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
 }
 
 /* Forms */

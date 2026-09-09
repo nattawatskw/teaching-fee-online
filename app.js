@@ -4675,47 +4675,162 @@ const DEFAULT_DATA = {
     }
 };
 
-// State
-let appData = JSON.parse(localStorage.getItem('teachingFeeData'));
-if (!appData || !appData.terms || appData.terms.length === 0 || !appData.terms[0].subjects || appData.terms[0].subjects.length === 0) {
-    appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
-    localStorage.setItem('teachingFeeData', JSON.stringify(appData));
-} else {
-    // Sanitize stale or empty summaryClaimData in loaded terms
-    let needSave = false;
-    appData.terms.forEach(t => {
-        if (!t.summaryClaimData) {
-            t.summaryClaimData = {};
-            needSave = true;
-        }
-        const sc = t.summaryClaimData;
-        const isStale = !sc.startDateStr || sc.startDateStr.includes('2 มิถุนายน') || sc.startDateStr.includes('มิถุนายน 2568');
-        if (isStale) {
-            const defTerm = (DEFAULT_DATA.terms || []).find(dt => dt.id === t.id);
-            if (defTerm && defTerm.summaryClaimData && defTerm.summaryClaimData.startDateStr) {
-                sc.startDateStr = defTerm.summaryClaimData.startDateStr;
-                sc.endDateStr = defTerm.summaryClaimData.endDateStr;
-                sc.termYearStr = defTerm.summaryClaimData.termYearStr || `${t.no}/${t.year}`;
-                needSave = true;
-            }
-        }
-        if (!sc.termYearStr || !sc.termYearStr.includes(String(t.no))) {
-            sc.termYearStr = `${t.no}/${t.year}`;
-            needSave = true;
-        }
-    });
-    if (needSave) {
-        localStorage.setItem('teachingFeeData', JSON.stringify(appData));
-    }
+// Multi-User Authentication & Storage State
+let currentUser = null; // { username, name, role, ... }
+
+function getUserStorageKey(username) {
+    if (!username || username === 'civilutc') return 'teachingFeeData';
+    return `teachingFeeData_${username}`;
 }
 
-let currentView = 'semesters'; // 'semesters' | 'subjects'
+function getLocalUsers() {
+    try {
+        const raw = localStorage.getItem('teaching_fee_local_users');
+        if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list) && list.length > 0) return list;
+        }
+    } catch (e) {}
+    const defaults = [
+        { username: 'civilutc', password: 'civilutc12345', name: 'แผนกวิชาช่างโยธา', role: 'user', createdAt: '2025-01-01T00:00:00.000Z' },
+        { username: 'admin', password: '12345', name: 'ผู้ดูแลระบบ (Admin)', role: 'admin', createdAt: '2025-01-01T00:00:00.000Z' }
+    ];
+    localStorage.setItem('teaching_fee_local_users', JSON.stringify(defaults));
+    return defaults;
+}
+
+function saveLocalUsers(users) {
+    localStorage.setItem('teaching_fee_local_users', JSON.stringify(users));
+}
+
+function getCurrentUser() {
+    try {
+        const sessionUser = sessionStorage.getItem('teaching_fee_current_user');
+        if (sessionUser) return JSON.parse(sessionUser);
+    } catch (e) {}
+    return null;
+}
+
+function setCurrentUser(user) {
+    currentUser = user;
+    if (user) {
+        sessionStorage.setItem('teaching_fee_current_user', JSON.stringify(user));
+    } else {
+        sessionStorage.removeItem('teaching_fee_current_user');
+    }
+    // Always clear legacy localStorage persistent remember keys so every new open requires login
+    localStorage.removeItem('teaching_fee_remembered_user');
+}
+
+function createEmptyUserData(username, name = '') {
+    const teachersList = (typeof DEFAULT_DATA !== 'undefined' && DEFAULT_DATA.teachers) 
+        ? DEFAULT_DATA.teachers 
+        : ((typeof EXTRACTED_DATA !== 'undefined' && EXTRACTED_DATA.teachers) ? EXTRACTED_DATA.teachers : []);
+
+    return {
+        teachers: JSON.parse(JSON.stringify(teachersList)),
+        subjects_master: [],
+        students: [],
+        terms: [],
+        departmentName: name || username || '',
+        lastModified: new Date().toISOString()
+    };
+}
+
+window.DEFAULT_DATA = DEFAULT_DATA;
+let appData = null;
+window.appData = null;
+
+function loadUserData(username) {
+    const key = getUserStorageKey(username);
+    let loaded = null;
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw) loaded = JSON.parse(raw);
+    } catch (e) {
+        console.warn('Failed to parse local user data for', username, e);
+    }
+
+    if (!loaded || ((!username || username === 'civilutc') && (!loaded.terms || loaded.terms.length === 0))) {
+        if (!username || username === 'civilutc') {
+            loaded = JSON.parse(JSON.stringify(DEFAULT_DATA));
+            localStorage.setItem(key, JSON.stringify(loaded));
+            localStorage.setItem('teachingFeeData', JSON.stringify(loaded));
+        } else {
+            loaded = createEmptyUserData(username, currentUser ? currentUser.name : '');
+            localStorage.setItem(key, JSON.stringify(loaded));
+        }
+    } else {
+        // Sanitize
+        if (!loaded.teachers || loaded.teachers.length === 0) {
+            const defTeachers = (typeof DEFAULT_DATA !== 'undefined' && DEFAULT_DATA.teachers) || [];
+            loaded.teachers = JSON.parse(JSON.stringify(defTeachers));
+        }
+        if (!loaded.terms) loaded.terms = [];
+        if (!loaded.subjects_master) loaded.subjects_master = [];
+        if (!loaded.students) loaded.students = [];
+
+        // For civilutc, sanitize stale or empty summaryClaimData
+        if (!username || username === 'civilutc') {
+            let needSave = false;
+            loaded.terms.forEach(t => {
+                if (!t.summaryClaimData) {
+                    t.summaryClaimData = {};
+                    needSave = true;
+                }
+                const sc = t.summaryClaimData;
+                const isStale = !sc.startDateStr || sc.startDateStr.includes('2 มิถุนายน') || sc.startDateStr.includes('มิถุนายน 2568');
+                if (isStale) {
+                    const defTerm = (DEFAULT_DATA.terms || []).find(dt => dt.id === t.id);
+                    if (defTerm && defTerm.summaryClaimData && defTerm.summaryClaimData.startDateStr) {
+                        sc.startDateStr = defTerm.summaryClaimData.startDateStr;
+                        sc.endDateStr = defTerm.summaryClaimData.endDateStr;
+                        sc.termYearStr = defTerm.summaryClaimData.termYearStr || `${t.no}/${t.year}`;
+                        needSave = true;
+                    }
+                }
+                if (!sc.termYearStr || !sc.termYearStr.includes(String(t.no))) {
+                    sc.termYearStr = `${t.no}/${t.year}`;
+                    needSave = true;
+                }
+            });
+            if (needSave) {
+                localStorage.setItem(key, JSON.stringify(loaded));
+                localStorage.setItem('teachingFeeData', JSON.stringify(loaded));
+            }
+        }
+    }
+
+    appData = loaded;
+    window.appData = appData;
+    window.currentUser = currentUser;
+    return appData;
+}
+
+// Pre-initialize appData for fallback safety
+const initialSessionUser = getCurrentUser();
+if (initialSessionUser) {
+    currentUser = initialSessionUser;
+    loadUserData(currentUser.username);
+} else {
+    // Default preview/fallback loads civilutc data
+    loadUserData('civilutc');
+}
+
+let currentView = 'semesters'; // 'semesters' | 'subjects' | 'login'
 let currentTermId = null;
 
 // Helpers
 const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
 const saveData = () => {
-    localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+    if (!appData) return;
+    const u = currentUser ? currentUser.username : 'civilutc';
+    const key = getUserStorageKey(u);
+    appData.lastModified = new Date().toISOString();
+    localStorage.setItem(key, JSON.stringify(appData));
+    if (u === 'civilutc') {
+        localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+    }
     if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
 };
 
@@ -4726,13 +4841,16 @@ const formatMoney = (amount) => {
 
 // Sync and Merge extracted data from data.js
 function syncAllExtractedData(forceOverwrite = false) {
-    if (typeof EXTRACTED_DATA === 'undefined') return;
+    if (typeof EXTRACTED_DATA === 'undefined' || !appData) return;
 
-    if (forceOverwrite) {
+    const isCivil = !currentUser || currentUser.username === 'civilutc';
+
+    if (forceOverwrite && isCivil) {
         appData.teachers = JSON.parse(JSON.stringify(EXTRACTED_DATA.teachers));
         appData.subjects_master = JSON.parse(JSON.stringify(EXTRACTED_DATA.subjects));
     } else {
-        // Merge teachers - Add any missing teachers
+        // Teachers list is shared across all accounts
+        if (!appData.teachers) appData.teachers = [];
         const existingTeacherNames = new Set(appData.teachers.map(t => t.name.trim()));
         EXTRACTED_DATA.teachers.forEach(t => {
             if (!existingTeacherNames.has(t.name.trim())) {
@@ -4741,28 +4859,31 @@ function syncAllExtractedData(forceOverwrite = false) {
             }
         });
 
-        // Merge subjects - Add any missing subjects and update credits/hours
-        const existingSubjectMap = new Map(appData.subjects_master.map(s => [s.code.trim(), s]));
-        EXTRACTED_DATA.subjects.forEach(s => {
-            const existing = existingSubjectMap.get(s.code.trim());
-            if (!existing) {
-                appData.subjects_master.push({
-                    id: s.id || generateId(),
-                    code: s.code.trim(),
-                    name: s.name.trim(),
-                    credits: s.credits,
-                    theoryHours: s.theoryHours !== undefined ? s.theoryHours : 3,
-                    practiceHours: s.practiceHours !== undefined ? s.practiceHours : 0,
-                    hours: s.hours || ((s.theoryHours || 0) + (s.practiceHours || 0))
-                });
-            } else {
-                existing.credits = s.credits;
-                existing.theoryHours = s.theoryHours !== undefined ? s.theoryHours : (existing.theoryHours !== undefined ? existing.theoryHours : 3);
-                existing.practiceHours = s.practiceHours !== undefined ? s.practiceHours : (existing.practiceHours !== undefined ? existing.practiceHours : 0);
-                existing.hours = s.hours || ((existing.theoryHours || 0) + (existing.practiceHours || 0));
-                if (!existing.name) existing.name = s.name.trim();
-            }
-        });
+        // Subjects are merged ONLY for civilutc. Newly registered accounts keep their own custom subjects!
+        if (isCivil) {
+            if (!appData.subjects_master) appData.subjects_master = [];
+            const existingSubjectMap = new Map(appData.subjects_master.map(s => [s.code.trim(), s]));
+            EXTRACTED_DATA.subjects.forEach(s => {
+                const existing = existingSubjectMap.get(s.code.trim());
+                if (!existing) {
+                    appData.subjects_master.push({
+                        id: s.id || generateId(),
+                        code: s.code.trim(),
+                        name: s.name.trim(),
+                        credits: s.credits,
+                        theoryHours: s.theoryHours !== undefined ? s.theoryHours : 3,
+                        practiceHours: s.practiceHours !== undefined ? s.practiceHours : 0,
+                        hours: s.hours || ((s.theoryHours || 0) + (s.practiceHours || 0))
+                    });
+                } else {
+                    existing.credits = s.credits;
+                    existing.theoryHours = s.theoryHours !== undefined ? s.theoryHours : (existing.theoryHours !== undefined ? existing.theoryHours : 3);
+                    existing.practiceHours = s.practiceHours !== undefined ? s.practiceHours : (existing.practiceHours !== undefined ? existing.practiceHours : 0);
+                    existing.hours = s.hours || ((existing.theoryHours || 0) + (existing.practiceHours || 0));
+                    if (!existing.name) existing.name = s.name.trim();
+                }
+            });
+        }
     }
 
     saveData();
@@ -4776,6 +4897,49 @@ function updateTabCounts() {
     if (elT) elT.textContent = appData.teachers.length;
     if (elS) elS.textContent = appData.subjects_master.length;
     if (elSt) elSt.textContent = appData.students.length;
+}
+
+// Update Navigation & User Container UI
+function updateUserNavUI() {
+    const navUserContainer = document.getElementById('nav-user-container');
+    const navUsernameText = document.getElementById('nav-username-text');
+    const btnAdminNav = document.getElementById('btn-admin-nav');
+    
+    if (currentUser) {
+        if (navUserContainer) navUserContainer.classList.remove('hidden');
+        if (navUsernameText) {
+            const displayName = currentUser.name ? `${currentUser.username} (${currentUser.name})` : currentUser.username;
+            navUsernameText.textContent = displayName;
+        }
+        if (btnAdminNav) {
+            if (currentUser.role === 'admin') {
+                btnAdminNav.classList.remove('hidden');
+            } else {
+                btnAdminNav.classList.add('hidden');
+            }
+        }
+    } else {
+        if (navUserContainer) navUserContainer.classList.add('hidden');
+        if (btnAdminNav) btnAdminNav.classList.add('hidden');
+    }
+}
+
+function checkAuthSession() {
+    const user = getCurrentUser();
+    if (user) {
+        currentUser = user;
+        loadUserData(currentUser.username);
+        updateUserNavUI();
+        syncAllExtractedData(false);
+        switchView('semesters');
+        if (typeof initCloudSync === 'function') {
+            initCloudSync();
+        }
+    } else {
+        currentUser = null;
+        updateUserNavUI();
+        switchView('login');
+    }
 }
 
 // Initialization
@@ -4792,7 +4956,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    runStep('syncAllExtractedData', () => syncAllExtractedData(false));
+    runStep('initAuthSystem', () => initAuthSystem());
     runStep('initModals', () => initModals());
     runStep('initTabs', () => initTabs());
     runStep('initSettingsCRUD', () => initSettingsCRUD());
@@ -4802,9 +4966,6 @@ document.addEventListener('DOMContentLoaded', () => {
     runStep('initDataImportSystem', () => initDataImportSystem());
     runStep('initSummaryClaimSystem', () => initSummaryClaimSystem());
     runStep('initBatchPrintSystem', () => initBatchPrintSystem());
-    runStep('initCloudSync', () => initCloudSync());
-    runStep('renderSemestersView', () => renderSemestersView());
-    runStep('updateGlobalStats', () => updateGlobalStats());
     
     // View Switchers
     runStep('viewSwitchers', () => {
@@ -4825,19 +4986,53 @@ document.addEventListener('DOMContentLoaded', () => {
             searchSubTerm.addEventListener('input', renderSubjectsView);
         }
     });
+
+    // Check Auth session
+    runStep('checkAuthSession', () => checkAuthSession());
 });
 
 // View Navigation
 let currentClaimSubjectId = null;
 
 function switchView(viewName, termId = null, subjectId = null) {
-    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(el => {
+        el.classList.remove('active');
+        el.classList.add('hidden');
+    });
     const target = document.getElementById(`view-${viewName}`);
-    if (target) target.classList.add('active');
+    if (target) {
+        target.classList.add('active');
+        target.classList.remove('hidden');
+    }
     currentView = viewName;
 
     const nav = document.querySelector('nav');
     const mainContainer = document.getElementById('main-app-container');
+    const navUserContainer = document.getElementById('nav-user-container');
+    const btnAdminNav = document.getElementById('btn-admin-nav');
+    const btnCloudSync = document.getElementById('btn-cloud-sync');
+    const btnBatchPrint = document.getElementById('btn-batch-print');
+    const btnSettings = document.getElementById('btn-settings');
+    
+    if (viewName === 'login') {
+        if (nav) nav.classList.remove('hidden');
+        if (mainContainer) {
+            mainContainer.className = 'container mx-auto px-4 min-h-[85vh] flex items-center justify-center';
+        }
+        if (navUserContainer) navUserContainer.classList.add('hidden');
+        if (btnAdminNav) btnAdminNav.classList.remove('hidden');
+        if (btnCloudSync) btnCloudSync.classList.add('hidden');
+        if (btnBatchPrint) btnBatchPrint.classList.add('hidden');
+        if (btnSettings) btnSettings.classList.add('hidden');
+        return;
+    }
+
+    // When logged in (not in login view), show user nav items
+    if (navUserContainer && currentUser) navUserContainer.classList.remove('hidden');
+    if (btnCloudSync) btnCloudSync.classList.remove('hidden');
+    if (btnBatchPrint) btnBatchPrint.classList.remove('hidden');
+    if (btnSettings) btnSettings.classList.remove('hidden');
+    if (btnAdminNav) btnAdminNav.classList.remove('hidden');
     
     if (viewName === 'semesters') {
         if (nav) nav.classList.remove('hidden');
@@ -6959,25 +7154,657 @@ function initEditSubjectModalLogic() {
 // SETTINGS / MODALS
 // ----------------------------------------------------
 function initModals() {
-    document.getElementById('btn-settings').addEventListener('click', () => {
-        renderSettingsLists();
-        openModal('modal-settings');
-    });
+    const btnSettings = document.getElementById('btn-settings');
+    if (btnSettings) {
+        btnSettings.addEventListener('click', () => {
+            renderSettingsLists();
+            openModal('modal-settings');
+        });
+    }
     
+    // Close modal on click of any .close-modal button
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const modal = e.target.closest('.modal');
-            if(modal) modal.classList.remove('active');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.classList.add('hidden');
+            }
         });
+    });
+
+    // Close modal on backdrop click
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+                modal.classList.add('hidden');
+            }
+        });
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const activeModal = document.querySelector('.modal.active:not(#modal-summary-claim)');
+            if (activeModal) {
+                activeModal.classList.remove('active');
+                activeModal.classList.add('hidden');
+            }
+        }
     });
 }
 
 function openModal(id) {
-    document.getElementById(id).classList.add('active');
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.add('active');
+        el.classList.remove('hidden');
+    }
 }
+
 function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('active');
+        el.classList.add('hidden');
+    }
 }
+
+// -------------------------------------------------------------------------
+// AUTHENTICATION & MULTI-USER MANAGEMENT SYSTEM
+// -------------------------------------------------------------------------
+function initAuthSystem() {
+    // 1. Tab Switchers in Login View
+    const tabLogin = document.getElementById('tab-btn-login');
+    const tabReg = document.getElementById('tab-btn-register');
+    const formLogin = document.getElementById('form-login');
+    const formReg = document.getElementById('form-register');
+    const btnSwitchToLogin = document.getElementById('btn-switch-to-login');
+
+    if (tabLogin && tabReg && formLogin && formReg) {
+        tabLogin.onclick = () => {
+            tabLogin.className = 'flex-1 py-3 text-center font-medium text-blue-400 border-b-2 border-blue-500 transition cursor-pointer flex items-center justify-center gap-2';
+            tabReg.className = 'flex-1 py-3 text-center font-medium text-gray-400 hover:text-white transition cursor-pointer flex items-center justify-center gap-2';
+            formLogin.classList.remove('hidden');
+            formReg.classList.add('hidden');
+        };
+
+        tabReg.onclick = () => {
+            tabReg.className = 'flex-1 py-3 text-center font-medium text-blue-400 border-b-2 border-blue-500 transition cursor-pointer flex items-center justify-center gap-2';
+            tabLogin.className = 'flex-1 py-3 text-center font-medium text-gray-400 hover:text-white transition cursor-pointer flex items-center justify-center gap-2';
+            formReg.classList.remove('hidden');
+            formLogin.classList.add('hidden');
+        };
+
+        if (btnSwitchToLogin) {
+            btnSwitchToLogin.onclick = () => tabLogin.click();
+        }
+    }
+
+    // 2. Toggle Login Password Visibility
+    const btnTogglePwd = document.getElementById('btn-toggle-login-pwd');
+    const loginPwdInput = document.getElementById('login-password');
+    if (btnTogglePwd && loginPwdInput) {
+        btnTogglePwd.onclick = () => {
+            if (loginPwdInput.type === 'password') {
+                loginPwdInput.type = 'text';
+                btnTogglePwd.innerHTML = '<i class="fa-solid fa-eye-slash"></i> ซ่อนรหัส';
+            } else {
+                loginPwdInput.type = 'password';
+                btnTogglePwd.innerHTML = '<i class="fa-regular fa-eye"></i> แสดงรหัส';
+            }
+        };
+    }
+
+    const loginUserInput = document.getElementById('login-username');
+
+    // 4. Submit Login
+    const btnLoginSubmit = document.getElementById('btn-login-submit');
+    if (btnLoginSubmit) {
+        btnLoginSubmit.onclick = handleLogin;
+    }
+    if (loginUserInput) {
+        loginUserInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+    }
+    if (loginPwdInput) {
+        loginPwdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+    }
+
+    // 5. Submit Register
+    const btnRegSubmit = document.getElementById('btn-register-submit');
+    if (btnRegSubmit) {
+        btnRegSubmit.onclick = handleRegister;
+    }
+    const regConfirmPwdInput = document.getElementById('reg-confirm-password');
+    if (regConfirmPwdInput) {
+        regConfirmPwdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleRegister();
+        });
+    }
+
+    // 6. Admin System Navigation & Password Authentication
+    const btnAdminNav = document.getElementById('btn-admin-nav');
+    if (btnAdminNav) {
+        btnAdminNav.onclick = () => {
+            // Open password prompt modal to verify admin
+            const userInput = document.getElementById('admin-auth-username');
+            const pwdInput = document.getElementById('admin-auth-password');
+            const errBox = document.getElementById('admin-auth-error');
+            if (userInput) userInput.value = '';
+            if (pwdInput) pwdInput.value = '';
+            if (errBox) errBox.classList.add('hidden');
+            openModal('modal-admin-auth');
+            setTimeout(() => {
+                if (userInput) userInput.focus();
+            }, 100);
+        };
+    }
+
+    const btnToggleAdminPwd = document.getElementById('btn-toggle-admin-pwd');
+    const adminAuthPwdInput = document.getElementById('admin-auth-password');
+    if (btnToggleAdminPwd && adminAuthPwdInput) {
+        btnToggleAdminPwd.onclick = () => {
+            if (adminAuthPwdInput.type === 'password') {
+                adminAuthPwdInput.type = 'text';
+                btnToggleAdminPwd.innerHTML = '<i class="fa-solid fa-eye-slash"></i> ซ่อนรหัส';
+            } else {
+                adminAuthPwdInput.type = 'password';
+                btnToggleAdminPwd.innerHTML = '<i class="fa-regular fa-eye"></i> แสดงรหัส';
+            }
+        };
+    }
+
+    const btnAdminAuthSubmit = document.getElementById('btn-admin-auth-submit');
+    if (btnAdminAuthSubmit) {
+        btnAdminAuthSubmit.onclick = handleAdminAuthSubmit;
+    }
+
+    const adminAuthUserInput = document.getElementById('admin-auth-username');
+    if (adminAuthUserInput) {
+        adminAuthUserInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleAdminAuthSubmit();
+        });
+    }
+    if (adminAuthPwdInput) {
+        adminAuthPwdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleAdminAuthSubmit();
+        });
+    }
+
+    const adminSearchInput = document.getElementById('admin-search-users');
+    if (adminSearchInput) {
+        adminSearchInput.addEventListener('input', () => {
+            loadAndRenderAdminUsers(adminSearchInput.value);
+        });
+    }
+
+    const btnAdminRefresh = document.getElementById('btn-admin-refresh-users');
+    if (btnAdminRefresh) {
+        btnAdminRefresh.onclick = () => {
+            loadAndRenderAdminUsers(adminSearchInput ? adminSearchInput.value : '');
+        };
+    }
+
+    // 7. Logout Button
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.onclick = () => {
+            if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
+                handleLogout();
+            }
+        };
+    }
+}
+
+async function handleAdminAuthSubmit() {
+    const uInput = document.getElementById('admin-auth-username');
+    const pInput = document.getElementById('admin-auth-password');
+    const errBox = document.getElementById('admin-auth-error');
+    const errText = document.getElementById('admin-auth-error-text');
+
+    const username = uInput ? uInput.value.trim().toLowerCase() : '';
+    const password = pInput ? pInput.value : '';
+
+    if (!username || !password) {
+        if (errBox && errText) {
+            errText.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน admin';
+            errBox.classList.remove('hidden');
+        } else {
+            alert('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน admin');
+        }
+        return;
+    }
+
+    // Check credentials (admin / 12345)
+    let isAdminValid = false;
+
+    // Check against configured/online users or default
+    let users = [];
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            const res = await fetch('/api/auth/users');
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success && Array.isArray(json.users)) {
+                    users = json.users;
+                    saveLocalUsers(users);
+                }
+            }
+        } catch (e) {}
+    }
+    if (users.length === 0) {
+        users = getLocalUsers();
+    }
+
+    const adminUser = users.find(u => u.username.toLowerCase() === 'admin');
+    if (adminUser) {
+        if (username === 'admin' && password === adminUser.password) {
+            isAdminValid = true;
+        }
+    } else {
+        if (username === 'admin' && password === '12345') {
+            isAdminValid = true;
+        }
+    }
+
+    if (!isAdminValid) {
+        if (errBox && errText) {
+            errText.textContent = 'ชื่อผู้ใช้หรือรหัสผ่าน admin ไม่ถูกต้อง!';
+            errBox.classList.remove('hidden');
+        } else {
+            alert('ชื่อผู้ใช้หรือรหัสผ่าน admin ไม่ถูกต้อง!');
+        }
+        return;
+    }
+
+    // Admin verified! Close auth prompt and open admin panel
+    closeModal('modal-admin-auth');
+    if (errBox) errBox.classList.add('hidden');
+    openModal('modal-admin-panel');
+    loadAndRenderAdminUsers(document.getElementById('admin-search-users')?.value || '');
+}
+
+async function handleLogin() {
+    const uInput = document.getElementById('login-username');
+    const pInput = document.getElementById('login-password');
+    if (!uInput || !pInput) return;
+
+    const username = uInput.value.trim();
+    const password = pInput.value;
+    if (!username || !password) {
+        alert('กรุณากรอกชื่อผู้ใช้งานและรหัสผ่าน');
+        return;
+    }
+
+    // Try online users first if available
+    let user = null;
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            const res = await fetch('/api/auth/users');
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success && Array.isArray(json.users)) {
+                    saveLocalUsers(json.users);
+                    user = json.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch online users, falling back to local:', e);
+        }
+    }
+
+    if (!user) {
+        const localList = getLocalUsers();
+        user = localList.find(u => u.username.toLowerCase() === username.toLowerCase());
+    }
+
+    if (!user) {
+        alert('ไม่พบชื่อผู้ใช้งานนี้ในระบบ หรือพิมพ์ชื่อผู้ใช้ผิด');
+        return;
+    }
+
+    if (user.password !== password) {
+        alert('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+        return;
+    }
+
+    if (user.status === 'suspended') {
+        alert('บัญชีผู้ใช้งานของคุณถูกระงับการเข้าใช้งานชั่วคราว\nกรุณาติดต่อผู้ดูแลระบบ (Admin)');
+        return;
+    }
+
+    // Login successful - save to session only (must log in again after browser closes)
+    setCurrentUser(user);
+    loadUserData(user.username);
+    updateUserNavUI();
+    switchView('semesters');
+
+    if (window.location.protocol.startsWith('http')) {
+        doCloudSync(false);
+    }
+}
+
+async function handleRegister() {
+    const uInput = document.getElementById('reg-username');
+    const dInput = document.getElementById('reg-dept-name');
+    const pInput = document.getElementById('reg-password');
+    const cpInput = document.getElementById('reg-confirm-password');
+
+    if (!uInput || !pInput || !cpInput) return;
+    const username = uInput.value.trim();
+    const deptName = dInput ? dInput.value.trim() : '';
+    const password = pInput.value;
+    const confirmPassword = cpInput.value;
+
+    if (!username || username.length < 3) {
+        alert('กรุณาระบุชื่อผู้ใช้งานอย่างน้อย 3 ตัวอักษร (ภาษาอังกฤษหรือตัวเลข)');
+        return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        alert('ชื่อผู้ใช้งานต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรือขีด (-) เท่านั้น');
+        return;
+    }
+    if (['admin', 'civilutc', 'api', 'sync'].includes(username.toLowerCase())) {
+        alert('ชื่อผู้ใช้งานนี้ถูกสงวนไว้ ไม่สามารถสมัครได้');
+        return;
+    }
+    if (!password || password.length < 4) {
+        alert('กรุณากำหนดรหัสผ่านอย่างน้อย 4 ตัวอักษร');
+        return;
+    }
+    if (password !== confirmPassword) {
+        alert('รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน');
+        return;
+    }
+
+    // Check existing
+    const localUsers = getLocalUsers();
+    const existsLocal = localUsers.some(u => u.username.toLowerCase() === username.toLowerCase());
+    if (existsLocal) {
+        alert('ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น');
+        return;
+    }
+
+    const newUser = {
+        username: username,
+        password: password,
+        name: deptName || username,
+        role: 'user',
+        createdAt: new Date().toISOString()
+    };
+
+    // Try online registration
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            const res = await fetch('/api/auth/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newUser)
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+                if (json.message && json.message.includes('มีผู้ใช้นี้อยู่แล้ว')) {
+                    alert('ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น');
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn('Online registration request failed, continuing locally:', e);
+        }
+    }
+
+    // Save locally
+    localUsers.push(newUser);
+    saveLocalUsers(localUsers);
+
+    // Initialize clean user data: empty subjects, empty students, empty terms, but 163 teachers
+    const newUserData = createEmptyUserData(newUser.username, newUser.name);
+    localStorage.setItem(getUserStorageKey(newUser.username), JSON.stringify(newUserData));
+
+    // Auto login
+    setCurrentUser(newUser);
+    loadUserData(newUser.username);
+    updateUserNavUI();
+    switchView('semesters');
+
+    // Push new clean data online if possible
+    if (window.location.protocol.startsWith('http')) {
+        doCloudPush(false);
+    }
+
+    alert(`ยินดีต้อนรับคุณ "${newUser.name}"!\nสมัครสมาชิกสำเร็จ เข้าสู่ระบบเรียบร้อยแล้ว\n(รายชื่ออาจารย์ทั้งหมดพร้อมใช้งาน คุณสามารถเพิ่มรายวิชาของแผนกได้ทันที)`);
+}
+
+function handleLogout() {
+    currentUser = null;
+    sessionStorage.removeItem('teaching_fee_current_user');
+    localStorage.removeItem('teaching_fee_remembered_user');
+    updateUserNavUI();
+    switchView('login');
+}
+
+async function loadAndRenderAdminUsers(filterText = '') {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-blue-400 mr-2"></i> กำลังโหลดข้อมูลบัญชีผู้ใช้...</td></tr>`;
+
+    let users = [];
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            const res = await fetch('/api/auth/users');
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success && Array.isArray(json.users)) {
+                    users = json.users;
+                    saveLocalUsers(users);
+                }
+            }
+        } catch (e) {
+            console.warn('Admin user list fetch failed:', e);
+        }
+    }
+
+    if (users.length === 0) {
+        users = getLocalUsers();
+    }
+
+    const filtered = users.filter(u => {
+        if (!filterText) return true;
+        const q = filterText.toLowerCase();
+        return (u.username && u.username.toLowerCase().includes(q)) ||
+               (u.name && u.name.toLowerCase().includes(q)) ||
+               (u.password && u.password.toLowerCase().includes(q));
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-500">ไม่พบบัญชีผู้ใช้ที่ตรงกับคำค้นหา</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map((u, idx) => {
+        const isCivil = u.username === 'civilutc';
+        const isAdmin = u.username === 'admin';
+        const isSuspended = u.status === 'suspended';
+        const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString('th-TH') : '-';
+        
+        return `
+            <tr class="hover:bg-[#1f2639] transition ${isSuspended ? 'bg-red-950/20 opacity-80' : ''}">
+                <td class="py-3 px-3 text-gray-400">${idx + 1}</td>
+                <td class="py-3 px-3">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        ${isAdmin ? '<i class="fa-solid fa-crown text-amber-400"></i>' : '<i class="fa-solid fa-user text-blue-400"></i>'}
+                        <span>${escapeHtml(u.username)}</span>
+                        ${isCivil ? '<span class="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30">โยธา</span>' : ''}
+                        ${isAdmin ? '<span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">Admin</span>' : ''}
+                    </div>
+                </td>
+                <td class="py-3 px-3">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-[#101322] border border-amber-500/30 text-amber-300 select-all">
+                            ${escapeHtml(u.password || '')}
+                        </span>
+                        <button type="button" onclick="navigator.clipboard.writeText('${escapeHtml(u.password || '')}'); alert('คัดลอกรหัสผ่าน ${escapeHtml(u.password || '')} แล้ว!');" class="text-gray-400 hover:text-white p-1 rounded hover:bg-[#2d3748] transition cursor-pointer" title="คัดลอกรหัสผ่าน">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                </td>
+                <td class="py-3 px-3 text-gray-300">
+                    <div>${escapeHtml(u.name || '-')}</div>
+                </td>
+                <td class="py-3 px-3 text-center">
+                    ${isSuspended 
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30"><i class="fa-solid fa-ban mr-1"></i>ถูกระงับ</span>'
+                        : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"><i class="fa-solid fa-check mr-1"></i>ปกติ</span>'
+                    }
+                </td>
+                <td class="py-3 px-3 text-gray-400 text-[11px]">${createdStr}</td>
+                <td class="py-3 px-3 text-center">
+                    <div class="flex items-center justify-center flex-wrap gap-1">
+                        <button type="button" onclick="adminSwitchToUser('${escapeHtml(u.username)}')" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 px-2 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1" title="สลับไปดูข้อมูลของบัญชีนี้">
+                            <i class="fa-solid fa-eye text-[11px]"></i> ดูข้อมูล
+                        </button>
+                        ${!isAdmin ? `
+                            <button type="button" onclick="adminResetUserData('${escapeHtml(u.username)}')" class="bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 px-2 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1" title="ลบข้อมูลทั้งหมดที่กรอกไว้ (เทอม/รายวิชา/นักศึกษา) แต่เก็บบัญชีไว้">
+                                <i class="fa-solid fa-eraser text-[11px]"></i> ลบข้อมูลที่กรอก
+                            </button>
+                            <button type="button" onclick="adminToggleSuspendUser('${escapeHtml(u.username)}', ${isSuspended ? 'true' : 'false'})" class="${isSuspended ? 'bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border-emerald-500/30' : 'bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border-rose-500/30'} border px-2 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1" title="${isSuspended ? 'ยกเลิกระงับการใช้งาน' : 'ระงับการเข้าสู่ระบบ'}">
+                                <i class="fa-solid ${isSuspended ? 'fa-unlock' : 'fa-ban'} text-[11px]"></i> ${isSuspended ? 'ปลดระงับ' : 'ระงับสิทธิ์'}
+                            </button>
+                        ` : ''}
+                        ${(!isAdmin && !isCivil) ? `
+                            <button type="button" onclick="adminDeleteUser('${escapeHtml(u.username)}')" class="bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 px-2 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1" title="ลบบัญชีผู้ใช้นี้ออกจากระบบอย่างถาวร">
+                                <i class="fa-solid fa-trash-can text-[11px]"></i> ลบบัญชี
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.adminSwitchToUser = function(username) {
+    const users = getLocalUsers();
+    const targetUser = users.find(u => u.username === username);
+    if (!targetUser) return alert('ไม่พบข้อมูลบัญชีผู้ใช้');
+    
+    if (confirm(`คุณต้องการสลับไปใช้งานในมุมมองของบัญชี "${username}" ใช่หรือไม่?`)) {
+        setCurrentUser(targetUser);
+        loadUserData(username);
+        updateUserNavUI();
+        closeModal('modal-admin-panel');
+        switchView('semesters');
+        if (window.location.protocol.startsWith('http')) {
+            doCloudSync(false);
+        }
+    }
+};
+
+window.adminResetUserData = async function(username) {
+    if (username === 'admin') return alert('บัญชี admin ไม่มีข้อมูลการเบิกจ่าย');
+    
+    if (!confirm(`คุณต้องการ "ลบข้อมูลที่กรอกทั้งหมด" ของบัญชี "${username}" ใช่หรือไม่?\n(ข้อมูลภาคเรียน, รายวิชาที่เพิ่ม, ข้อมูลนักศึกษา และใบเบิกทั้งหมดจะถูกรีเซ็ตเป็นค่าเริ่มต้นว่างเปล่า แต่บัญชีและรหัสผ่านจะยังอยู่)`)) {
+        return;
+    }
+
+    // 1. Reset Cloud Data
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            await fetch('/api/auth/users', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, action: 'reset_data' })
+            });
+        } catch (e) {
+            console.warn('Online reset user data failed:', e);
+        }
+    }
+
+    // 2. Reset Local Data
+    const users = getLocalUsers();
+    const targetUser = users.find(u => u.username === username);
+    const emptyData = createEmptyUserData(username, targetUser ? targetUser.name : username);
+    const key = getUserStorageKey(username);
+    localStorage.setItem(key, JSON.stringify(emptyData));
+    if (username === 'civilutc') {
+        localStorage.setItem('teachingFeeData', JSON.stringify(emptyData));
+    }
+
+    // If currently operating under this user, reload
+    if (currentUser && currentUser.username === username) {
+        loadUserData(username);
+        if (currentView === 'semesters') renderSemestersView();
+    }
+
+    alert(`ล้างข้อมูลที่กรอกทั้งหมดของ "${username}" เรียบร้อยแล้ว!`);
+};
+
+window.adminToggleSuspendUser = async function(username, currentlySuspended) {
+    if (username === 'admin') return alert('ไม่สามารถระงับบัญชี admin ได้');
+    const newStatus = currentlySuspended ? 'active' : 'suspended';
+    const actionText = currentlySuspended ? 'ยกเลิกระงับการใช้งาน' : 'ระงับการเข้าใช้งาน';
+
+    if (!confirm(`คุณต้องการ "${actionText}" บัญชี "${username}" ใช่หรือไม่?`)) {
+        return;
+    }
+
+    // 1. Online update
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            await fetch('/api/auth/users', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, status: newStatus })
+            });
+        } catch (e) {
+            console.warn('Online toggle user status failed:', e);
+        }
+    }
+
+    // 2. Local update
+    let users = getLocalUsers();
+    const user = users.find(u => u.username === username);
+    if (user) {
+        user.status = newStatus;
+        saveLocalUsers(users);
+    }
+
+    loadAndRenderAdminUsers(document.getElementById('admin-search-users')?.value || '');
+    alert(`ดำเนินการ "${actionText}" บัญชี "${username}" เรียบร้อยแล้ว!`);
+};
+
+window.adminDeleteUser = async function(username) {
+    if (username === 'admin' || username === 'civilutc') {
+        alert('ไม่สามารถลบบัญชีหลักของระบบได้');
+        return;
+    }
+    if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบบัญชี "${username}"? ข้อมูลและบัญชีทั้งหมดจะถูกลบถาวร`)) {
+        return;
+    }
+
+    if (window.location.protocol.startsWith('http')) {
+        try {
+            await fetch(`/api/auth/users?username=${encodeURIComponent(username)}`, {
+                method: 'DELETE'
+            });
+        } catch (e) {
+            console.warn('Online user deletion failed:', e);
+        }
+    }
+
+    let users = getLocalUsers().filter(u => u.username !== username);
+    saveLocalUsers(users);
+    localStorage.removeItem(getUserStorageKey(username));
+
+    loadAndRenderAdminUsers(document.getElementById('admin-search-users')?.value || '');
+    alert(`ลบบัญชี "${username}" เรียบร้อยแล้ว`);
+};
 
 function initTabs() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -13253,14 +14080,13 @@ let cloudSyncDebounceTimer = null;
 
 async function initCloudSync() {
     const btnSync = document.getElementById('btn-cloud-sync');
-    const modalSync = document.getElementById('modal-cloud-sync');
     const btnSyncNow = document.getElementById('btn-cloud-sync-now');
     const btnPull = document.getElementById('btn-cloud-pull-force');
     const btnPush = document.getElementById('btn-cloud-push-force');
 
-    if (btnSync && modalSync) {
+    if (btnSync) {
         btnSync.onclick = () => {
-            modalSync.classList.remove('hidden');
+            openModal('modal-cloud-sync');
         };
     }
 
@@ -13293,7 +14119,7 @@ async function initCloudSync() {
         return;
     }
 
-    // Initial check and fetch on page load
+    // Initial check and fetch on login/load
     await doCloudSync(false);
 }
 
@@ -13352,8 +14178,9 @@ function updateCloudSyncUI(status, label, updatedAt) {
 async function doCloudSync(isManual = false) {
     if (!window.location.protocol.startsWith('http')) return;
     try {
+        const u = currentUser ? currentUser.username : 'civilutc';
         updateCloudSyncUI('syncing');
-        const res = await fetch('/api/sync');
+        const res = await fetch(`/api/sync?user=${encodeURIComponent(u)}`);
         if (!res.ok) {
             updateCloudSyncUI('error', 'ซิงค์ผิดพลาด');
             return;
@@ -13365,19 +14192,23 @@ async function doCloudSync(isManual = false) {
         }
 
         if (json.success) {
-            if (json.data && json.data.terms) {
+            if (json.data && (json.data.terms || json.data.teachers)) {
                 const cloudTime = json.updatedAt ? new Date(json.updatedAt).getTime() : 0;
-                const localTime = appData.lastModified ? new Date(appData.lastModified).getTime() : 0;
+                const localTime = appData && appData.lastModified ? new Date(appData.lastModified).getTime() : 0;
 
                 if (cloudTime > localTime) {
                     appData = json.data;
-                    localStorage.setItem('teachingFeeData', JSON.stringify(appData));
-                    renderSemestersView();
+                    const key = getUserStorageKey(u);
+                    localStorage.setItem(key, JSON.stringify(appData));
+                    if (u === 'civilutc') {
+                        localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+                    }
+                    if (currentView === 'semesters') renderSemestersView();
                     if (typeof renderAnnualDaysChart === 'function') renderAnnualDaysChart();
                 } else if (localTime > cloudTime || !json.data) {
                     await doCloudPush(false);
                 }
-            } else if (!json.data && appData && appData.terms && appData.terms.length > 0) {
+            } else if (!json.data && appData && ((appData.terms && appData.terms.length > 0) || (appData.teachers && appData.teachers.length > 0))) {
                 await doCloudPush(false);
             }
 
@@ -13394,15 +14225,22 @@ async function doCloudSync(isManual = false) {
 async function doCloudPush(showAlert = true) {
     if (!window.location.protocol.startsWith('http')) return;
     try {
+        const u = currentUser ? currentUser.username : 'civilutc';
         updateCloudSyncUI('syncing');
         const now = new Date().toISOString();
-        appData.lastModified = now;
-        localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+        if (appData) {
+            appData.lastModified = now;
+            const key = getUserStorageKey(u);
+            localStorage.setItem(key, JSON.stringify(appData));
+            if (u === 'civilutc') {
+                localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+            }
+        }
 
         const res = await fetch('/api/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: appData, updatedAt: now })
+            body: JSON.stringify({ user: u, data: appData, updatedAt: now })
         });
         const json = await res.json();
         if (json.success) {
@@ -13421,13 +14259,18 @@ async function doCloudPush(showAlert = true) {
 async function doCloudPull() {
     if (!window.location.protocol.startsWith('http')) return;
     try {
+        const u = currentUser ? currentUser.username : 'civilutc';
         updateCloudSyncUI('syncing');
-        const res = await fetch('/api/sync');
+        const res = await fetch(`/api/sync?user=${encodeURIComponent(u)}`);
         const json = await res.json();
         if (json.success && json.data) {
             appData = json.data;
-            localStorage.setItem('teachingFeeData', JSON.stringify(appData));
-            renderSemestersView();
+            const key = getUserStorageKey(u);
+            localStorage.setItem(key, JSON.stringify(appData));
+            if (u === 'civilutc') {
+                localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+            }
+            if (currentView === 'semesters') renderSemestersView();
             renderAnnualChart();
             updateCloudSyncUI('ready', 'คลาวด์ซิงค์', json.updatedAt || new Date().toISOString());
             alert('ดึงข้อมูลล่าสุดจาก Cloudflare เรียบร้อยแล้ว!');
@@ -13443,6 +14286,7 @@ async function doCloudPull() {
 
 function triggerAutoCloudSync() {
     if (!window.location.protocol.startsWith('http')) return;
+    if (!currentUser) return;
     if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
     cloudSyncDebounceTimer = setTimeout(() => {
         doCloudPush(false);

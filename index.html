@@ -49,7 +49,10 @@
                 <p class="text-xs text-gray-400">วิทยาลัยเทคนิคอุบลราชธานี | ระบบจัดการภาคเรียนและปีการศึกษา</p>
             </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center flex-wrap gap-2">
+            <button id="btn-admin-nav" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-gray-900 font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 text-xs shadow-sm transition cursor-pointer" title="เข้าสู่ระบบผู้ดูแลระบบ (Admin)">
+                <i class="fa-solid fa-shield-halved"></i> ระบบ admin
+            </button>
             <button id="btn-cloud-sync" class="bg-[#242b3d] hover:bg-[#2d3748] border border-[#3f4b61] text-gray-200 px-3.5 py-2 rounded-lg flex items-center gap-2 text-sm transition cursor-pointer shadow-sm" title="สถานะการซิงค์ข้อมูล Cloudflare">
                 <span id="cloud-sync-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                 <span id="cloud-sync-text" class="text-xs font-medium">คลาวด์ซิงค์</span>
@@ -60,14 +63,129 @@
             <button id="btn-settings" class="bg-[#2d3748] hover:bg-[#3f4b61] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition">
                 <i class="fa-solid fa-gear"></i> ตั้งค่า
             </button>
+            <div id="nav-user-container" class="flex items-center gap-2 pl-2 border-l border-[#2d3748]">
+                <span id="nav-user-badge" class="text-xs text-blue-300 font-mono bg-blue-900/30 px-2.5 py-1.5 rounded-lg border border-blue-500/30 flex items-center gap-1.5" title="ผู้ใช้งานปัจจุบัน">
+                    <i class="fa-solid fa-user-circle"></i> <span id="nav-username-text">civilutc</span>
+                </span>
+                <button id="btn-logout" class="bg-[#242b3d] hover:bg-red-900/40 text-gray-300 hover:text-red-300 border border-[#3f4b61] hover:border-red-500/40 px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer" title="ออกจากระบบ">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
+                </button>
+            </div>
         </div>
     </nav>
 
     <!-- Main Container -->
     <main id="main-app-container" class="container mx-auto px-4 py-8 max-w-6xl">
 
+        <!-- VIEW: Login & Registration -->
+        <div id="view-login" class="view flex items-center justify-center py-6 w-full">
+            <div class="card-gradient w-full max-w-md rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden animate-in">
+                <!-- Header -->
+                <div class="p-6 pb-4 text-center border-b border-[#2d3748] bg-[#1c2134]">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-3xl mx-auto mb-3 shadow-lg shadow-blue-500/25">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 inline-block mb-2">
+                        วิทยาลัยเทคนิคอุบลราชธานี
+                    </span>
+                    <h2 class="text-xl font-bold text-white tracking-tight">ระบบเบิกเงินค่าตอบแทน ป.ตรี</h2>
+                    <p class="text-xs text-gray-400 mt-1">เข้าสู่ระบบเพื่อจัดการรายวิชาและพิมพ์เอกสารเบิกจ่าย</p>
+                </div>
+
+                <!-- Tabs: Login / Register -->
+                <div class="flex border-b border-[#2d3748] bg-[#141725] text-sm">
+                    <button type="button" id="tab-btn-login" class="flex-1 py-3 text-center font-medium text-blue-400 border-b-2 border-blue-500 transition cursor-pointer flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+                    </button>
+                    <button type="button" id="tab-btn-register" class="flex-1 py-3 text-center font-medium text-gray-400 hover:text-white transition cursor-pointer flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> สมัครสมาชิกใหม่
+                    </button>
+                </div>
+
+                <div class="p-6 space-y-4">
+                    <!-- Form 1: LOGIN -->
+                    <form id="form-login" class="space-y-4" onsubmit="return false;">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
+                                <i class="fa-solid fa-user text-gray-400"></i> ชื่อผู้ใช้งาน (Username)
+                            </label>
+                            <input type="text" id="login-username" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition text-sm" placeholder="กรอกชื่อผู้ใช้งานของคุณ" autocomplete="username" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
+                                <span class="flex items-center gap-1.5"><i class="fa-solid fa-lock text-gray-400"></i> รหัสผ่าน (Password)</span>
+                                <button type="button" id="btn-toggle-login-pwd" class="text-xs text-gray-400 hover:text-blue-400 transition cursor-pointer">
+                                    <i class="fa-regular fa-eye"></i> แสดงรหัส
+                                </button>
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="login-password" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition text-sm" placeholder="กรอกรหัสผ่านของคุณ" autocomplete="current-password" required>
+                            </div>
+                        </div>
+
+
+
+                        <!-- Login Button -->
+                        <button type="button" id="btn-login-submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-lg shadow-blue-500/25 transition cursor-pointer flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+                        </button>
+                    </form>
+
+                    <!-- Form 2: REGISTER -->
+                    <form id="form-register" class="space-y-3.5 hidden" onsubmit="return false;">
+                        <div class="bg-blue-950/40 border border-blue-800/50 rounded-xl p-3 text-xs text-blue-300 leading-relaxed flex items-start gap-2">
+                            <i class="fa-solid fa-circle-info text-blue-400 mt-0.5 text-sm"></i>
+                            <div>
+                                <span class="font-bold text-white block">สิทธิพิเศษสำหรับบัญชีใหม่:</span>
+                                บัญชีที่สมัครใหม่จะคงรายชื่ออาจารย์ทั้งหมดในระบบไว้ตามเดิม แต่จะเริ่มต้นไม่มีรายวิชาและไม่มีนักศึกษา เพื่อให้คุณเพิ่มเองใหม่ตามสาขาวิชาได้อย่างอิสระ
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-user-plus text-gray-400"></i> ตั้งชื่อผู้ใช้งาน (Username) <span class="text-red-400">*</span>
+                            </label>
+                            <input type="text" id="reg-username" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition text-sm" placeholder="ภาษาอังกฤษหรือตัวเลข เช่น elec_utc" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-building-columns text-gray-400"></i> สาขาวิชา / แผนกวิชา
+                            </label>
+                            <input type="text" id="reg-dept-name" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition text-sm" placeholder="เช่น เทคโนโลยีไฟฟ้า, เทคโนโลยีเครื่องกล">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-lock text-gray-400"></i> ตั้งรหัสผ่าน (Password) <span class="text-red-400">*</span>
+                            </label>
+                            <input type="password" id="reg-password" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition text-sm" placeholder="กำหนดรหัสผ่าน" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-shield text-gray-400"></i> ยืนยันรหัสผ่าน (Confirm Password) <span class="text-red-400">*</span>
+                            </label>
+                            <input type="password" id="reg-confirm-password" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition text-sm" placeholder="กรอกรหัสผ่านซ้ำอีกครั้ง" required>
+                        </div>
+
+                        <button type="button" id="btn-register-submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-lg shadow-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-2 pt-2">
+                            <i class="fa-solid fa-check"></i> สร้างบัญชีใหม่และเข้าใช้งาน
+                        </button>
+
+                        <div class="text-center pt-2">
+                            <button type="button" id="btn-switch-to-login" class="text-xs text-gray-400 hover:text-white transition cursor-pointer">
+                                มีบัญชีอยู่แล้ว? <span class="text-blue-400 font-medium">เข้าสู่ระบบที่นี่</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- VIEW: Semesters List -->
-        <div id="view-semesters" class="view active space-y-8">
+        <div id="view-semesters" class="view space-y-8">
             
             <!-- Summary Stats -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1654,8 +1772,155 @@
         </div>
     </div>
 
+    <!-- Modal: Admin Auth Prompt -->
+    <div id="modal-admin-auth" class="modal fixed inset-0 bg-black/75 z-50 items-center justify-center p-4">
+        <div class="card-gradient w-full max-w-sm rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden animate-in">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-[#2d3748] flex justify-between items-center bg-[#1c2134]">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        <i class="fa-solid fa-shield-halved text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">ระบบ admin</h3>
+                        <p class="text-xs text-gray-400">ยืนยันตัวตนผู้ดูแลระบบ</p>
+                    </div>
+                </div>
+                <button type="button" class="close-modal text-gray-400 hover:text-white text-lg cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- Body -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user text-amber-400"></i> ชื่อผู้ใช้ (Admin Username)
+                    </label>
+                    <input type="text" id="admin-auth-username" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition text-sm" placeholder="กรอกชื่อผู้ใช้ admin" autocomplete="username">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-lock text-amber-400"></i> รหัสผ่าน (Admin Password)</span>
+                        <button type="button" id="btn-toggle-admin-pwd" class="text-xs text-gray-400 hover:text-amber-400 transition cursor-pointer">
+                            <i class="fa-regular fa-eye"></i> แสดงรหัส
+                        </button>
+                    </label>
+                    <input type="password" id="admin-auth-password" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition text-sm" placeholder="กรอกรหัสผ่าน admin" autocomplete="current-password">
+                </div>
+                <div id="admin-auth-error" class="hidden text-xs text-red-400 bg-red-950/40 border border-red-800/50 p-2.5 rounded-xl flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-exclamation text-red-400"></i>
+                    <span id="admin-auth-error-text">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</span>
+                </div>
+                <button type="button" id="btn-admin-auth-submit" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-gray-950 font-bold py-2.5 px-4 rounded-xl text-sm shadow-lg shadow-amber-500/25 transition cursor-pointer flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-key"></i> ยืนยันรหัสเข้าสู่ระบบ admin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Admin Panel -->
+    <div id="modal-admin-panel" class="modal fixed inset-0 bg-black/75 z-50 items-center justify-center p-4">
+        <div class="card-gradient w-full max-w-4xl rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden animate-in flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-[#2d3748] flex justify-between items-center bg-[#1c2134]">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        <i class="fa-solid fa-shield-halved text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-white text-lg">แผงควบคุมผู้ดูแลระบบ (Admin Portal)</h3>
+                            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Super Admin</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-0.5">ดูรายชื่อผู้ใช้งาน รหัสผ่าน และจัดการบัญชีในระบบ</p>
+                    </div>
+                </div>
+                <button type="button" class="close-modal text-gray-400 hover:text-white text-lg cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 overflow-y-auto space-y-5 flex-1">
+                <!-- Top Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="p-3.5 bg-[#141725] border border-[#2d3748] rounded-xl flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400">ผู้ใช้ทั้งหมด</p>
+                            <p class="text-xl font-bold text-white" id="admin-stat-total-users">0</p>
+                        </div>
+                    </div>
+                    <div class="p-3.5 bg-[#141725] border border-[#2d3748] rounded-xl flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400">บัญชีที่สมัครใหม่</p>
+                            <p class="text-xl font-bold text-emerald-400" id="admin-stat-registered-users">0</p>
+                        </div>
+                    </div>
+                    <div class="p-3.5 bg-[#141725] border border-[#2d3748] rounded-xl flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-cloud"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400">สถานะคลาวด์</p>
+                            <p class="text-sm font-bold text-purple-300" id="admin-stat-cloud-status">เชื่อมต่อ KV</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search & Action Toolbar -->
+                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-1">
+                    <div class="relative flex-1 max-w-sm">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-gray-500 text-xs"></i>
+                        <input type="text" id="admin-search-users" class="w-full bg-[#141725] border border-[#2d3748] rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" placeholder="ค้นหาชื่อผู้ใช้ หรือสาขาวิชา...">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="btn-admin-refresh-users" class="bg-[#242b3d] hover:bg-[#2d3748] text-gray-300 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 border border-[#3f4b61] transition cursor-pointer">
+                            <i class="fa-solid fa-rotate"></i> รีเฟรชรายชื่อ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="border border-[#2d3748] rounded-xl overflow-hidden bg-[#141725]">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="border-b border-[#2d3748] bg-[#1c2134] text-gray-400">
+                                    <th class="py-2.5 px-3 font-medium">ลำดับ</th>
+                                    <th class="py-2.5 px-3 font-medium">ชื่อผู้ใช้งาน (Username)</th>
+                                    <th class="py-2.5 px-3 font-medium text-amber-400"><i class="fa-solid fa-key mr-1"></i> รหัสผ่าน (Password)</th>
+                                    <th class="py-2.5 px-3 font-medium">สาขาวิชา / ข้อมูล</th>
+                                    <th class="py-2.5 px-3 font-medium text-center">สถานะ</th>
+                                    <th class="py-2.5 px-3 font-medium">วันที่สมัคร</th>
+                                    <th class="py-2.5 px-3 font-medium text-center">การจัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-tbody" class="divide-y divide-[#2d3748]/60 text-gray-300">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-3 border-t border-[#2d3748] bg-[#181c2d] flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-400">
+                <span><i class="fa-solid fa-shield-halved text-amber-400 mr-1"></i> แผงควบคุมผู้ดูแลระบบ (Admin Dashboard)</span>
+                <button type="button" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-4 py-1.5 rounded-lg text-xs transition cursor-pointer">
+                    ปิด
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Cloud Sync Status & Actions -->
-    <div id="modal-cloud-sync" class="modal fixed inset-0 bg-black/75 z-50 hidden flex items-center justify-center p-4">
+    <div id="modal-cloud-sync" class="modal fixed inset-0 bg-black/75 z-50 items-center justify-center p-4">
         <div class="card-gradient w-full max-w-md rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden animate-in">
             <div class="px-6 py-4 border-b border-[#2d3748] flex justify-between items-center bg-[#1c2134]">
                 <div class="flex items-center gap-2.5">
