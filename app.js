@@ -4727,12 +4727,23 @@ function createEmptyUserData(username, name = '') {
         ? DEFAULT_DATA.teachers 
         : ((typeof EXTRACTED_DATA !== 'undefined' && EXTRACTED_DATA.teachers) ? EXTRACTED_DATA.teachers : []);
 
+    const isCivil = (!username || username === 'civilutc');
+    const defSig = (typeof extractSignatures2To9 === 'function' && typeof DEFAULT_RC_CLAIM !== 'undefined')
+        ? extractSignatures2To9(DEFAULT_RC_CLAIM.signatures)
+        : {};
+    if (!isCivil) {
+        defSig.programChair = '';
+    } else if (!defSig.programChair) {
+        defSig.programChair = 'นายณัฐวรรธน์ เกษกุล';
+    }
+
     return {
         teachers: JSON.parse(JSON.stringify(teachersList)),
         subjects_master: [],
         students: [],
         terms: [],
         departmentName: name || username || '',
+        defaultSignatures2To9: defSig,
         lastModified: new Date().toISOString()
     };
 }
@@ -4797,6 +4808,32 @@ function loadUserData(username) {
             if (needSave) {
                 localStorage.setItem(key, JSON.stringify(loaded));
                 localStorage.setItem('teachingFeeData', JSON.stringify(loaded));
+            }
+        } else {
+            // For non-civil users, sanitize stale legacy 'นายปริวัฒน์ ยืนยิ่ง' in programChair
+            let needSave = false;
+            if (loaded.defaultSignatures2To9 && loaded.defaultSignatures2To9.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
+                loaded.defaultSignatures2To9.programChair = '';
+                needSave = true;
+            }
+            if (loaded.terms && Array.isArray(loaded.terms)) {
+                loaded.terms.forEach(t => {
+                    if (t.subjects && Array.isArray(t.subjects)) {
+                        t.subjects.forEach(sub => {
+                            if (sub.claimData && sub.claimData.signatures && sub.claimData.signatures.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
+                                sub.claimData.signatures.programChair = '';
+                                needSave = true;
+                            }
+                        });
+                    }
+                    if (t.summaryClaimData && t.summaryClaimData.signatures && t.summaryClaimData.signatures.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
+                        t.summaryClaimData.signatures.programChair = '';
+                        needSave = true;
+                    }
+                });
+            }
+            if (needSave) {
+                localStorage.setItem(key, JSON.stringify(loaded));
             }
         }
     }
@@ -6524,6 +6561,47 @@ function renderTeacherLeavesTable(term) {
 // ----------------------------------------------------
 // SUBJECTS VIEW (Inside Term)
 // ----------------------------------------------------
+function getTermProgramChair(term) {
+    if (!term) return '';
+    const isCivil = (typeof currentUser !== 'undefined' && currentUser && currentUser.username === 'civilutc');
+
+    // 1. ตรวจสอบจากรายวิชาในภาคเรียนปัจจุบัน
+    if (term.subjects && Array.isArray(term.subjects)) {
+        for (const sub of term.subjects) {
+            if (sub.claimData && sub.claimData.signatures && sub.claimData.signatures.programChair) {
+                const pc = String(sub.claimData.signatures.programChair).trim();
+                if (pc && (isCivil || pc !== 'นายปริวัฒน์ ยืนยิ่ง')) {
+                    return pc;
+                }
+            }
+        }
+    }
+
+    // 2. ตรวจสอบจาก summaryClaimData
+    if (term.summaryClaimData && term.summaryClaimData.signatures && term.summaryClaimData.signatures.programChair) {
+        const pc = String(term.summaryClaimData.signatures.programChair).trim();
+        if (pc && (isCivil || pc !== 'นายปริวัฒน์ ยืนยิ่ง')) {
+            return pc;
+        }
+    }
+
+    // 3. ตรวจสอบจาก defaultSignatures2To9
+    if (typeof appData !== 'undefined' && appData && appData.defaultSignatures2To9 && appData.defaultSignatures2To9.programChair) {
+        const pc = String(appData.defaultSignatures2To9.programChair).trim();
+        if (pc && (isCivil || pc !== 'นายปริวัฒน์ ยืนยิ่ง')) {
+            return pc;
+        }
+    }
+
+    // 4. กรณีเป็น civilutc ให้ใช้ค่าเริ่มต้น 'นายณัฐวรรธน์ เกษกุล'
+    if (isCivil) {
+        return 'นายณัฐวรรธน์ เกษกุล';
+    }
+
+    // สำหรับผู้ใช้ใหม่/ผู้ใช้อื่นที่ยังไม่ได้กรอก ให้เว้นว่าง
+    return '';
+}
+
 function renderSubjectsView() {
     const term = appData.terms.find(t => t.id === currentTermId);
     if(!term) return switchView('semesters');
@@ -6553,6 +6631,21 @@ function renderSubjectsView() {
     
     document.getElementById('term-stat-subjects').textContent = totalSubs;
     document.getElementById('term-stat-money').textContent = formatMoney(totalMoney);
+    
+    // ผู้ขอเบิกเงินหลัก: ดึงจากชื่อประธานหลักสูตรของภาคเรียนนี้ (ถ้าว่างหรือไม่พบ ให้แสดง '-')
+    const progChair = getTermProgramChair(term);
+    const mainTeacherEl = document.getElementById('term-main-teacher');
+    if (mainTeacherEl) {
+        if (progChair) {
+            mainTeacherEl.textContent = progChair;
+            mainTeacherEl.classList.remove('text-gray-500', 'font-normal');
+            mainTeacherEl.classList.add('text-white', 'font-bold');
+        } else {
+            mainTeacherEl.textContent = '-';
+            mainTeacherEl.classList.remove('text-white', 'font-bold');
+            mainTeacherEl.classList.add('text-gray-500', 'font-normal');
+        }
+    }
     
     const grid = document.getElementById('subjects-grid');
     grid.innerHTML = '';
@@ -8805,7 +8898,7 @@ const DEFAULT_RC_CLAIM = {
     signatures: {
         teacher: "นายณัฐวรรธน์ เกษกุล",
         teacherRole: "อาจารย์ผู้สอน",
-        programChair: "นายปริวัฒน์ ยืนยิ่ง",
+        programChair: "",
         programChairRole: "ประธานหลักสูตรสาขาวิชาเทคโนโลยีโยธา",
         curriculumHead: "นายชนะ สุทธิประภา",
         curriculumHeadRole: "หัวหน้างานพัฒนาหลักสูตรสายเทคโนโลยีฯ",
@@ -8916,6 +9009,12 @@ function getDefaultSignatures2To9() {
 
     // 3. Fallback to DEFAULT_RC_CLAIM
     const fallback = extractSignatures2To9(typeof DEFAULT_RC_CLAIM !== 'undefined' ? DEFAULT_RC_CLAIM.signatures : null);
+    const isCivil = (typeof currentUser !== 'undefined' && currentUser && currentUser.username === 'civilutc');
+    if (!isCivil) {
+        fallback.programChair = '';
+    } else if (!fallback.programChair) {
+        fallback.programChair = 'นายณัฐวรรธน์ เกษกุล';
+    }
     if (typeof appData !== 'undefined' && appData) {
         appData.defaultSignatures2To9 = fallback;
         if (typeof saveData === 'function') saveData();
@@ -9791,7 +9890,7 @@ function populateSidebarFromClaimData() {
 
     document.getElementById('sig-teacher-name').value = sig.teacher || activeClaim.teacherName || '';
     const inpProgChair = document.getElementById('sig-program-chair');
-    if (inpProgChair) inpProgChair.value = sig.programChair || defSig.programChair || 'นายปริวัฒน์ ยืนยิ่ง';
+    if (inpProgChair) inpProgChair.value = sig.programChair || defSig.programChair || '';
     const lblProgChair = document.getElementById('label-sig-program-chair');
     if (lblProgChair) lblProgChair.textContent = `2. ประธานหลักสูตรสาขาวิชา${deptName}`;
 
@@ -11243,7 +11342,7 @@ function generateA4Page2HTML(claim = activeClaim) {
                     </div>
                     <div>
                         ลงชื่อ........................................................<br>
-                        ( ${sig.programChair || sig.deptHead || 'นายปริวัฒน์ ยืนยิ่ง'} )<br>
+                        ( ${sig.programChair || '........................................................'} )<br>
                         ${sig.programChairRole || getFormattedDeptRole(claim.department || '', 'programChair')}
                     </div>
                 </div>
