@@ -1102,38 +1102,86 @@
                 
                 <!-- Tab Content: Teachers -->
                 <div id="tab-teachers" class="tab-content">
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        <input type="text" id="search-teacher" placeholder="🔍 ค้นหาชื่ออาจารย์..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm">
-                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 rounded-lg text-sm flex items-center gap-1.5 transition font-medium" data-category="teacher">
-                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ (PDF/Excel/รูป)
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <input type="text" id="search-teacher" placeholder="🔍 ค้นหาชื่ออาจารย์..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm bg-[#0f121d] border border-[#2d3748] text-white">
+                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 transition font-medium" data-category="teacher">
+                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์
                         </button>
-                        <button id="btn-open-add-teacher" class="btn-primary px-4 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                        <button id="btn-open-add-teacher" class="btn-primary px-3 py-2 rounded-lg text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus"></i> เพิ่มอาจารย์</button>
                     </div>
-                    <ul id="list-teachers" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+
+                    <!-- Batch Selection Bar for Teachers -->
+                    <div class="flex items-center justify-between bg-[#141725] px-3 py-2 rounded-lg border border-[#2d3748] mb-3 text-xs">
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white font-medium select-none">
+                                <input type="checkbox" id="chk-all-teachers" class="w-4 h-4 rounded text-blue-600 bg-[#0f121d] border-gray-600 cursor-pointer">
+                                <span>เลือกทั้งหมด</span>
+                            </label>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400">เลือกแล้ว <span id="count-selected-teachers" class="text-blue-400 font-bold">0</span> ท่าน</span>
+                        </div>
+                        <button type="button" id="btn-delete-selected-teachers" disabled class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-medium cursor-pointer">
+                            <i class="fa-solid fa-trash-can"></i> ลบที่เลือก (<span id="btn-delete-teachers-num">0</span>)
+                        </button>
+                    </div>
+
+                    <ul id="list-teachers" class="space-y-1.5 max-h-[380px] overflow-y-auto pr-1"></ul>
                 </div>
 
                 <!-- Tab Content: Subjects -->
                 <div id="tab-subjects" class="tab-content hidden">
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        <input type="text" id="search-subject" placeholder="🔍 ค้นหารหัส หรือ ชื่อวิชา..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm">
-                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 rounded-lg text-sm flex items-center gap-1.5 transition font-medium" data-category="subject">
-                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ (PDF/Excel/รูป)
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <input type="text" id="search-subject" placeholder="🔍 ค้นหารหัส หรือ ชื่อวิชา..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm bg-[#0f121d] border border-[#2d3748] text-white">
+                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 transition font-medium" data-category="subject">
+                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์
                         </button>
-                        <button id="btn-open-add-subject" class="btn-primary px-4 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                        <button id="btn-open-add-subject" class="btn-primary px-3 py-2 rounded-lg text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus"></i> เพิ่มรายวิชา</button>
                     </div>
-                    <ul id="list-subjects" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+
+                    <!-- Batch Selection Bar for Subjects -->
+                    <div class="flex items-center justify-between bg-[#141725] px-3 py-2 rounded-lg border border-[#2d3748] mb-3 text-xs">
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white font-medium select-none">
+                                <input type="checkbox" id="chk-all-subjects" class="w-4 h-4 rounded text-blue-600 bg-[#0f121d] border-gray-600 cursor-pointer">
+                                <span>เลือกทั้งหมด</span>
+                            </label>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400">เลือกแล้ว <span id="count-selected-subjects" class="text-blue-400 font-bold">0</span> วิชา</span>
+                        </div>
+                        <button type="button" id="btn-delete-selected-subjects" disabled class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-medium cursor-pointer">
+                            <i class="fa-solid fa-trash-can"></i> ลบที่เลือก (<span id="btn-delete-subjects-num">0</span>)
+                        </button>
+                    </div>
+
+                    <ul id="list-subjects" class="space-y-1.5 max-h-[380px] overflow-y-auto pr-1"></ul>
                 </div>
 
                 <!-- Tab Content: Students -->
                 <div id="tab-students" class="tab-content hidden">
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        <input type="text" id="search-student" placeholder="🔍 ค้นหารหัส หรือ ชื่อนักศึกษา..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm">
-                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 rounded-lg text-sm flex items-center gap-1.5 transition font-medium" data-category="student">
-                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ (PDF/Excel/รูป)
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <input type="text" id="search-student" placeholder="🔍 ค้นหารหัส หรือ ชื่อนักศึกษา..." class="flex-1 min-w-[200px] p-2 rounded-lg text-sm bg-[#0f121d] border border-[#2d3748] text-white">
+                        <button type="button" class="btn-import-trigger bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 transition font-medium" data-category="student">
+                            <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์
                         </button>
-                        <button id="btn-open-add-student" class="btn-primary px-4 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                        <button id="btn-open-add-student" class="btn-primary px-3 py-2 rounded-lg text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus"></i> เพิ่มนักศึกษา</button>
                     </div>
-                    <ul id="list-students" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+
+                    <!-- Batch Selection Bar for Students -->
+                    <div class="flex items-center justify-between bg-[#141725] px-3 py-2 rounded-lg border border-[#2d3748] mb-3 text-xs">
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white font-medium select-none">
+                                <input type="checkbox" id="chk-all-students" class="w-4 h-4 rounded text-blue-600 bg-[#0f121d] border-gray-600 cursor-pointer">
+                                <span>เลือกทั้งหมด</span>
+                            </label>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400">เลือกแล้ว <span id="count-selected-students" class="text-blue-400 font-bold">0</span> คน</span>
+                        </div>
+                        <button type="button" id="btn-delete-selected-students" disabled class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-medium cursor-pointer">
+                            <i class="fa-solid fa-trash-can"></i> ลบที่เลือก (<span id="btn-delete-students-num">0</span>)
+                        </button>
+                    </div>
+
+                    <ul id="list-students" class="space-y-1.5 max-h-[380px] overflow-y-auto pr-1"></ul>
                 </div>
             </div>
             <div class="p-4 border-t border-[#2d3748] flex flex-col sm:flex-row justify-between items-center gap-3 bg-[#141725] rounded-b-xl">
@@ -1436,19 +1484,23 @@
                     </div>
                 </div>
 
-                <!-- 5. Hours, Rate, Student count -->
-                <div class="grid grid-cols-3 gap-3 bg-[#141725] p-3 rounded-lg border border-[#2d3748]">
+                <!-- 5. Credits, Hours, Rate, Student count -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#141725] p-3 rounded-lg border border-[#2d3748]">
+                    <div>
+                        <label class="block text-xs text-blue-400 font-semibold mb-1">หน่วยกิต (นก.)</label>
+                        <input type="number" id="edit-term-sub-credits" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-blue-500/40 text-blue-300 font-mono font-bold text-center" min="0" max="20" placeholder="3">
+                    </div>
                     <div>
                         <label class="block text-xs text-gray-400 mb-1">ชม. สอนรวม</label>
-                        <input type="number" id="edit-term-sub-hours" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-mono" min="1" placeholder="54">
+                        <input type="number" id="edit-term-sub-hours" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-mono text-center" min="1" placeholder="54">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-400 mb-1">อัตราเบิก (บ./ชม.)</label>
-                        <input type="number" id="edit-term-sub-rate" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-emerald-400 font-bold font-mono" min="1" placeholder="42">
+                        <input type="number" id="edit-term-sub-rate" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-emerald-400 font-bold font-mono text-center" min="1" placeholder="42">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-400 mb-1">จำนวน นศ. (คน)</label>
-                        <input type="number" id="edit-term-sub-students" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-mono" min="1" placeholder="6">
+                        <input type="number" id="edit-term-sub-students" class="w-full p-2 rounded-lg text-xs bg-[#0f121d] border border-[#2d3748] text-white font-mono text-center" min="1" placeholder="6">
                     </div>
                 </div>
 

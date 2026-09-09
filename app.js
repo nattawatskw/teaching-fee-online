@@ -4846,43 +4846,21 @@ function syncAllExtractedData(forceOverwrite = false) {
     const isCivil = !currentUser || currentUser.username === 'civilutc';
 
     if (forceOverwrite && isCivil) {
-        appData.teachers = JSON.parse(JSON.stringify(EXTRACTED_DATA.teachers));
-        appData.subjects_master = JSON.parse(JSON.stringify(EXTRACTED_DATA.subjects));
+        appData.teachers = JSON.parse(JSON.stringify(EXTRACTED_DATA.teachers || []));
+        appData.subjects_master = JSON.parse(JSON.stringify(EXTRACTED_DATA.subjects || []));
     } else {
-        // Teachers list is shared across all accounts
+        // Teachers list: initialize only if completely empty
         if (!appData.teachers) appData.teachers = [];
-        const existingTeacherNames = new Set(appData.teachers.map(t => t.name.trim()));
-        EXTRACTED_DATA.teachers.forEach(t => {
-            if (!existingTeacherNames.has(t.name.trim())) {
-                appData.teachers.push({ id: t.id || generateId(), name: t.name.trim() });
-                existingTeacherNames.add(t.name.trim());
-            }
-        });
+        if (appData.teachers.length === 0 && EXTRACTED_DATA.teachers) {
+            appData.teachers = JSON.parse(JSON.stringify(EXTRACTED_DATA.teachers));
+        }
 
-        // Subjects are merged ONLY for civilutc. Newly registered accounts keep their own custom subjects!
+        // Subjects master: initialize only if completely empty on civil account initial setup
         if (isCivil) {
-            if (!appData.subjects_master) appData.subjects_master = [];
-            const existingSubjectMap = new Map(appData.subjects_master.map(s => [s.code.trim(), s]));
-            EXTRACTED_DATA.subjects.forEach(s => {
-                const existing = existingSubjectMap.get(s.code.trim());
-                if (!existing) {
-                    appData.subjects_master.push({
-                        id: s.id || generateId(),
-                        code: s.code.trim(),
-                        name: s.name.trim(),
-                        credits: s.credits,
-                        theoryHours: s.theoryHours !== undefined ? s.theoryHours : 3,
-                        practiceHours: s.practiceHours !== undefined ? s.practiceHours : 0,
-                        hours: s.hours || ((s.theoryHours || 0) + (s.practiceHours || 0))
-                    });
-                } else {
-                    existing.credits = s.credits;
-                    existing.theoryHours = s.theoryHours !== undefined ? s.theoryHours : (existing.theoryHours !== undefined ? existing.theoryHours : 3);
-                    existing.practiceHours = s.practiceHours !== undefined ? s.practiceHours : (existing.practiceHours !== undefined ? existing.practiceHours : 0);
-                    existing.hours = s.hours || ((existing.theoryHours || 0) + (existing.practiceHours || 0));
-                    if (!existing.name) existing.name = s.name.trim();
-                }
-            });
+            if (!appData.subjects_master) {
+                appData.subjects_master = JSON.parse(JSON.stringify(EXTRACTED_DATA.subjects || []));
+            }
+            // DO NOT re-add deleted subjects or overwrite user credits!
         }
     }
 
@@ -6939,6 +6917,8 @@ function openEditSubjectModal(sub) {
     if (hoursInput) hoursInput.value = sub.hours || 54;
     if (rateInput) rateInput.value = sub.rate || term.hourlyRate || 42;
     if (studentsInput) studentsInput.value = sub.studentCount || (appData.students ? appData.students.length : 6);
+    const creditsInput = document.getElementById('edit-term-sub-credits');
+    if (creditsInput) creditsInput.value = sub.credits !== undefined ? sub.credits : (masterSub.credits !== undefined ? masterSub.credits : (sub.claimData?.credits || 3));
 
     const updateMoney = () => {
         const h = parseFloat(hoursInput?.value) || 0;
@@ -6976,6 +6956,8 @@ function saveEditSubjectModal() {
     const hours = parseFloat(document.getElementById('edit-term-sub-hours').value) || sub.hours || 54;
     const rate = parseFloat(document.getElementById('edit-term-sub-rate').value) || sub.rate || 42;
     const studentCount = parseInt(document.getElementById('edit-term-sub-students').value, 10) || sub.studentCount || 6;
+    const creditsInput = document.getElementById('edit-term-sub-credits');
+    const credits = creditsInput ? (parseInt(creditsInput.value, 10) || 3) : (sub.credits || 3);
 
     if (!newCode && !newName) {
         alert('กรุณาระบุรหัสวิชาหรือชื่อรายวิชา');
@@ -6990,10 +6972,12 @@ function saveEditSubjectModal() {
     if (masterSub) {
         if (newCode) masterSub.code = newCode;
         if (newName) masterSub.name = newName;
+        masterSub.credits = credits;
     }
 
     sub.code = newCode;
     sub.name = newName;
+    sub.credits = credits;
     if (teacherId) sub.teacherId = teacherId;
     sub.level = level;
     sub.time = time;
@@ -7005,6 +6989,7 @@ function saveEditSubjectModal() {
     if (sub.claimData) {
         if (newCode) sub.claimData.subjectCode = newCode;
         if (newName) sub.claimData.subjectName = newName;
+        sub.claimData.credits = credits;
         if (teacherName) {
             sub.claimData.teacherName = teacherName;
             if (sub.claimData.signatures) sub.claimData.signatures.teacher = teacherName;
@@ -7081,6 +7066,10 @@ function initEditSubjectModalLogic() {
                     codeInput.value = s.code;
                     nameInput.value = s.name;
                     searchInput.value = `[${s.code}] ${s.name}`;
+                    const editTermCred = document.getElementById('edit-term-sub-credits');
+                    if (editTermCred && s.credits !== undefined) {
+                        editTermCred.value = s.credits;
+                    }
                     if (s.hours) {
                         const term = appData.terms.find(t => t.id === currentTermId);
                         const tempClaim = createInitialSubjectClaimData(term, s);
@@ -7157,6 +7146,9 @@ function initModals() {
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
         btnSettings.addEventListener('click', () => {
+            selectedTeacherSettingsIds.clear();
+            selectedSubjectSettingsIds.clear();
+            selectedStudentSettingsIds.clear();
             renderSettingsLists();
             openModal('modal-settings');
         });
@@ -7809,19 +7801,23 @@ window.adminDeleteUser = async function(username) {
 function initTabs() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
+            const targetBtn = e.target.closest('.tab-btn');
+            if (!targetBtn) return;
             // Remove active from all btns
             document.querySelectorAll('.tab-btn').forEach(b => {
                 b.classList.remove('active', 'text-blue-400', 'border-blue-500', 'border-b-2');
                 b.classList.add('text-gray-400');
             });
             // Add active to clicked
-            e.target.classList.add('active', 'text-blue-400', 'border-blue-500', 'border-b-2');
-            e.target.classList.remove('text-gray-400');
+            targetBtn.classList.add('active', 'text-blue-400', 'border-blue-500', 'border-b-2');
+            targetBtn.classList.remove('text-gray-400');
             
             // Hide all contents
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             // Show target
-            document.getElementById(e.target.dataset.tab).classList.remove('hidden');
+            const tabId = targetBtn.getAttribute('data-tab');
+            const targetContent = document.getElementById(tabId);
+            if (targetContent) targetContent.classList.remove('hidden');
         });
     });
 }
@@ -8032,48 +8028,182 @@ function openEditModal(type, item) {
     openModal('modal-edit-item');
 }
 
+let selectedTeacherSettingsIds = new Set();
+let selectedSubjectSettingsIds = new Set();
+let selectedStudentSettingsIds = new Set();
+let settingsBatchEventsInitialized = false;
+
+function initSettingsBatchEvents() {
+    if (settingsBatchEventsInitialized) return;
+    settingsBatchEventsInitialized = true;
+
+    // Teachers Batch Delete
+    const chkAllTeachers = document.getElementById('chk-all-teachers');
+    const btnDelTeachers = document.getElementById('btn-delete-selected-teachers');
+    if (chkAllTeachers) {
+        chkAllTeachers.addEventListener('change', () => {
+            const qTeacher = (document.getElementById('search-teacher')?.value || '').toLowerCase();
+            const filtered = (appData.teachers || []).filter(t => (t.name || '').toLowerCase().includes(qTeacher));
+            if (chkAllTeachers.checked) {
+                filtered.forEach(t => selectedTeacherSettingsIds.add(t.id));
+            } else {
+                filtered.forEach(t => selectedTeacherSettingsIds.delete(t.id));
+            }
+            renderSettingsLists();
+        });
+    }
+    if (btnDelTeachers) {
+        btnDelTeachers.addEventListener('click', () => {
+            const count = selectedTeacherSettingsIds.size;
+            if (count === 0) return;
+            if (confirm(`ยืนยันการลบอาจารย์ที่เลือกทั้งหมด ${count} ท่านหรือไม่?`)) {
+                appData.teachers = (appData.teachers || []).filter(t => !selectedTeacherSettingsIds.has(t.id));
+                selectedTeacherSettingsIds.clear();
+                saveData();
+                renderSettingsLists();
+                if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
+            }
+        });
+    }
+
+    // Subjects Batch Delete
+    const chkAllSubjects = document.getElementById('chk-all-subjects');
+    const btnDelSubjects = document.getElementById('btn-delete-selected-subjects');
+    if (chkAllSubjects) {
+        chkAllSubjects.addEventListener('change', () => {
+            const qSubject = (document.getElementById('search-subject')?.value || '').toLowerCase();
+            const filtered = (appData.subjects_master || []).filter(s => 
+                (s.name || '').toLowerCase().includes(qSubject) || (s.code || '').toLowerCase().includes(qSubject)
+            );
+            if (chkAllSubjects.checked) {
+                filtered.forEach(s => selectedSubjectSettingsIds.add(s.id));
+            } else {
+                filtered.forEach(s => selectedSubjectSettingsIds.delete(s.id));
+            }
+            renderSettingsLists();
+        });
+    }
+    if (btnDelSubjects) {
+        btnDelSubjects.addEventListener('click', () => {
+            const count = selectedSubjectSettingsIds.size;
+            if (count === 0) return;
+            if (confirm(`ยืนยันการลบรายวิชา Master ที่เลือกทั้งหมด ${count} วิชาหรือไม่?`)) {
+                appData.subjects_master = (appData.subjects_master || []).filter(s => !selectedSubjectSettingsIds.has(s.id));
+                selectedSubjectSettingsIds.clear();
+                saveData();
+                renderSettingsLists();
+                if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
+            }
+        });
+    }
+
+    // Students Batch Delete
+    const chkAllStudents = document.getElementById('chk-all-students');
+    const btnDelStudents = document.getElementById('btn-delete-selected-students');
+    if (chkAllStudents) {
+        chkAllStudents.addEventListener('change', () => {
+            const qStudent = (document.getElementById('search-student')?.value || '').toLowerCase();
+            const filtered = (appData.students || []).filter(st => 
+                (st.name || '').toLowerCase().includes(qStudent) || (st.studentId || '').toLowerCase().includes(qStudent)
+            );
+            if (chkAllStudents.checked) {
+                filtered.forEach(st => selectedStudentSettingsIds.add(st.id));
+            } else {
+                filtered.forEach(st => selectedStudentSettingsIds.delete(st.id));
+            }
+            renderSettingsLists();
+        });
+    }
+    if (btnDelStudents) {
+        btnDelStudents.addEventListener('click', () => {
+            const count = selectedStudentSettingsIds.size;
+            if (count === 0) return;
+            if (confirm(`ยืนยันการลบรายชื่อนักศึกษาที่เลือกทั้งหมด ${count} คนหรือไม่?`)) {
+                appData.students = (appData.students || []).filter(st => !selectedStudentSettingsIds.has(st.id));
+                selectedStudentSettingsIds.clear();
+                saveData();
+                renderSettingsLists();
+                if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
+            }
+        });
+    }
+}
+
 function renderSettingsLists() {
     updateTabCounts();
+    initSettingsBatchEvents();
     const qTeacher = (document.getElementById('search-teacher').value || '').toLowerCase();
     const qSubject = (document.getElementById('search-subject').value || '').toLowerCase();
     const qStudent = (document.getElementById('search-student').value || '').toLowerCase();
 
-    const createListItem = (text, onDelete, onEdit) => {
+    const createListItem = (id, text, isSelected, onToggle, onDelete, onEdit) => {
         const li = document.createElement('li');
-        li.className = 'flex justify-between items-center bg-[#141725] p-2 rounded border border-[#2d3748] hover:border-[#3f4b61] transition';
-        li.innerHTML = `<span class="text-sm text-gray-300 flex-1">${text}</span>
-                        <div class="flex gap-2 ml-2">
-                            <button class="btn-edit bg-blue-900/30 text-blue-400 hover:text-blue-300 hover:bg-blue-900/50 px-2 py-1 rounded"><i class="fa-solid fa-pen-to-square"></i></button>
-                            <button class="btn-delete bg-red-900/30 text-gray-400 hover:text-red-400 hover:bg-red-900/50 px-2 py-1 rounded"><i class="fa-solid fa-xmark"></i></button>
-                        </div>`;
-        li.querySelector('.btn-delete').addEventListener('click', onDelete);
-        li.querySelector('.btn-edit').addEventListener('click', onEdit);
+        li.className = `flex justify-between items-center p-2 rounded-lg border transition cursor-pointer select-none ${
+            isSelected ? 'bg-blue-950/40 border-blue-500/50 text-white' : 'bg-[#141725] border-[#2d3748] hover:border-[#3f4b61] text-gray-200'
+        }`;
+        li.innerHTML = `
+            <div class="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
+                <input type="checkbox" class="w-4 h-4 rounded text-blue-600 bg-[#0f121d] border-gray-600 cursor-pointer pointer-events-none" ${isSelected ? 'checked' : ''}>
+                <div class="flex-1 min-w-0">${text}</div>
+            </div>
+            <div class="flex items-center gap-1.5 ml-2 shrink-0">
+                <button type="button" class="btn-edit bg-blue-900/30 text-blue-400 hover:text-blue-300 hover:bg-blue-900/50 p-1.5 rounded transition cursor-pointer" title="แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button type="button" class="btn-delete bg-red-900/30 text-gray-400 hover:text-red-400 hover:bg-red-900/50 p-1.5 rounded transition cursor-pointer" title="ลบ"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        `;
+        li.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-edit') || e.target.closest('.btn-delete')) return;
+            onToggle();
+        });
+        li.querySelector('.btn-delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            onDelete();
+        });
+        li.querySelector('.btn-edit').addEventListener('click', (e) => {
+            e.stopPropagation();
+            onEdit();
+        });
         return li;
     };
-    
-    // Teachers
+
+    // 1. Teachers
     const lt = document.getElementById('list-teachers');
     lt.innerHTML = '';
-    const filteredTeachers = appData.teachers.filter(t => t.name.toLowerCase().includes(qTeacher));
+    const filteredTeachers = (appData.teachers || []).filter(t => (t.name || '').toLowerCase().includes(qTeacher));
     filteredTeachers.forEach(t => {
-        lt.appendChild(createListItem(t.name, 
-        () => {
-            if(confirm('ยืนยันการลบอาจารย์ท่านนี้?')) {
-                appData.teachers = appData.teachers.filter(x => x.id !== t.id);
-                saveData(); renderSettingsLists();
-            }
-        },
-        () => openEditModal('teacher', t)));
+        const isSelected = selectedTeacherSettingsIds.has(t.id);
+        const text = `<span class="text-sm font-medium">${t.name}</span>`;
+        lt.appendChild(createListItem(
+            t.id,
+            text,
+            isSelected,
+            () => {
+                if (selectedTeacherSettingsIds.has(t.id)) selectedTeacherSettingsIds.delete(t.id);
+                else selectedTeacherSettingsIds.add(t.id);
+                renderSettingsLists();
+            },
+            () => {
+                if (confirm(`ยืนยันการลบอาจารย์ "${t.name}"?`)) {
+                    appData.teachers = appData.teachers.filter(x => x.id !== t.id);
+                    selectedTeacherSettingsIds.delete(t.id);
+                    saveData();
+                    renderSettingsLists();
+                    if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
+                }
+            },
+            () => openEditModal('teacher', t)
+        ));
     });
-    if(filteredTeachers.length === 0) lt.innerHTML = '<li class="text-center text-gray-500 text-sm py-4">ไม่พบข้อมูล</li>';
-    
-    // Subjects
+    if (filteredTeachers.length === 0) lt.innerHTML = '<li class="text-center text-gray-500 text-sm py-4">ไม่พบข้อมูลอาจารย์</li>';
+
+    // 2. Subjects
     const ls = document.getElementById('list-subjects');
     ls.innerHTML = '';
-    const filteredSubjects = appData.subjects_master.filter(s => 
-        s.name.toLowerCase().includes(qSubject) || s.code.toLowerCase().includes(qSubject)
+    const filteredSubjects = (appData.subjects_master || []).filter(s => 
+        (s.name || '').toLowerCase().includes(qSubject) || (s.code || '').toLowerCase().includes(qSubject)
     );
     filteredSubjects.forEach(s => {
+        const isSelected = selectedSubjectSettingsIds.has(s.id);
         const th = s.theoryHours !== undefined ? s.theoryHours : 0;
         const pr = s.practiceHours !== undefined ? s.practiceHours : 0;
         const se = s.selfHours !== undefined ? s.selfHours : Math.max(0, (s.credits || 3) * 3 - th - pr);
@@ -8081,49 +8211,112 @@ function renderSettingsLists() {
         
         let text = `<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 flex-1 pr-2">
             <div>
-                <strong class="text-white text-sm font-semibold">[${s.code}]</strong>
-                <span class="text-gray-200 text-sm ml-1">${s.name}</span>
+                <strong class="text-blue-300 font-mono text-xs font-semibold">[${s.code}]</strong>
+                <span class="text-sm ml-1 text-white font-medium">${s.name}</span>
             </div>
             <div class="flex items-center gap-1.5 flex-shrink-0">
-                <span class="text-xs bg-blue-950/60 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30 font-medium whitespace-nowrap">
-                    ${s.credits || 3} นก.
+                <span class="text-[11px] bg-blue-950/60 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30 font-bold whitespace-nowrap">
+                    ${s.credits !== undefined ? s.credits : 3} นก.
                 </span>
-                <span class="text-xs bg-orange-950/60 text-orange-300 px-2 py-0.5 rounded border border-orange-500/30 font-medium whitespace-nowrap">
+                <span class="text-[11px] bg-orange-950/60 text-orange-300 px-2 py-0.5 rounded border border-orange-500/30 font-medium whitespace-nowrap">
                     ท-ป-ศ: ${th}-${pr}-${se}
                 </span>
-                <span class="text-xs bg-emerald-950/60 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-medium whitespace-nowrap">
+                <span class="text-[11px] bg-emerald-950/60 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-medium whitespace-nowrap">
                     สอน ${hrs} ชม.
                 </span>
             </div>
         </div>`;
-        ls.appendChild(createListItem(text, 
-        () => {
-            if(confirm('ยืนยันการลบรายวิชานี้?')) {
-                appData.subjects_master = appData.subjects_master.filter(x => x.id !== s.id);
-                saveData(); renderSettingsLists();
-            }
-        },
-        () => openEditModal('subject', s)));
+        ls.appendChild(createListItem(
+            s.id,
+            text,
+            isSelected,
+            () => {
+                if (selectedSubjectSettingsIds.has(s.id)) selectedSubjectSettingsIds.delete(s.id);
+                else selectedSubjectSettingsIds.add(s.id);
+                renderSettingsLists();
+            },
+            () => {
+                if (confirm(`ยืนยันการลบรายวิชา "[${s.code}] ${s.name}"?`)) {
+                    appData.subjects_master = appData.subjects_master.filter(x => x.id !== s.id);
+                    selectedSubjectSettingsIds.delete(s.id);
+                    saveData();
+                    renderSettingsLists();
+                    if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
+                }
+            },
+            () => openEditModal('subject', s)
+        ));
     });
-    if(filteredSubjects.length === 0) ls.innerHTML = '<li class="text-center text-gray-500 text-sm py-4">ไม่พบข้อมูล</li>';
-    
-    // Students
+    if (filteredSubjects.length === 0) ls.innerHTML = '<li class="text-center text-gray-500 text-sm py-4">ไม่พบข้อมูลรายวิชา</li>';
+
+    // 3. Students
     const lstu = document.getElementById('list-students');
     lstu.innerHTML = '';
-    const filteredStudents = appData.students.filter(st => 
-        st.name.toLowerCase().includes(qStudent) || st.studentId.toLowerCase().includes(qStudent)
+    const filteredStudents = (appData.students || []).filter(st => 
+        (st.name || '').toLowerCase().includes(qStudent) || (st.studentId || '').toLowerCase().includes(qStudent)
     );
     filteredStudents.forEach(st => {
-        lstu.appendChild(createListItem(`${st.studentId} - ${st.name}`, 
-        () => {
-            if(confirm('ยืนยันการลบรายชื่อนักศึกษานี้?')) {
-                appData.students = appData.students.filter(x => x.id !== st.id);
-                saveData(); renderSettingsLists();
-            }
-        },
-        () => openEditModal('student', st)));
+        const isSelected = selectedStudentSettingsIds.has(st.id);
+        const text = `
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-mono text-blue-400 font-semibold">${st.studentId || 'ไม่มีรหัส'}</span>
+                <span class="text-sm font-medium text-white">${st.name}</span>
+            </div>
+        `;
+        lstu.appendChild(createListItem(
+            st.id,
+            text,
+            isSelected,
+            () => {
+                if (selectedStudentSettingsIds.has(st.id)) selectedStudentSettingsIds.delete(st.id);
+                else selectedStudentSettingsIds.add(st.id);
+                renderSettingsLists();
+            },
+            () => {
+                if (confirm(`ยืนยันการลบรายชื่อนักศึกษา "${st.name}"?`)) {
+                    appData.students = appData.students.filter(x => x.id !== st.id);
+                    selectedStudentSettingsIds.delete(st.id);
+                    saveData();
+                    renderSettingsLists();
+                    if (typeof triggerAutoCloudSync === 'function') triggerAutoCloudSync();
+                }
+            },
+            () => openEditModal('student', st)
+        ));
     });
-    if(filteredStudents.length === 0) lstu.innerHTML = '<li class="text-center text-gray-500 text-sm py-4">ไม่พบข้อมูล</li>';
+    if (filteredStudents.length === 0) lstu.innerHTML = '<li class="text-center text-gray-500 text-sm py-4">ไม่พบข้อมูลนักศึกษา</li>';
+
+    // Update Toolbar Batch Counters & States
+    const countTeachers = selectedTeacherSettingsIds.size;
+    const countSubjects = selectedSubjectSettingsIds.size;
+    const countStudents = selectedStudentSettingsIds.size;
+
+    const countSelT = document.getElementById('count-selected-teachers');
+    const btnDelTNum = document.getElementById('btn-delete-teachers-num');
+    const btnDelT = document.getElementById('btn-delete-selected-teachers');
+    const chkAllT = document.getElementById('chk-all-teachers');
+    if (countSelT) countSelT.textContent = countTeachers;
+    if (btnDelTNum) btnDelTNum.textContent = countTeachers;
+    if (btnDelT) btnDelT.disabled = (countTeachers === 0);
+    if (chkAllT) chkAllT.checked = (filteredTeachers.length > 0 && filteredTeachers.every(t => selectedTeacherSettingsIds.has(t.id)));
+
+    const countSelS = document.getElementById('count-selected-subjects');
+    const btnDelSNum = document.getElementById('btn-delete-subjects-num');
+    const btnDelS = document.getElementById('btn-delete-selected-subjects');
+    const chkAllS = document.getElementById('chk-all-subjects');
+    if (countSelS) countSelS.textContent = countSubjects;
+    if (btnDelSNum) btnDelSNum.textContent = countSubjects;
+    if (btnDelS) btnDelS.disabled = (countSubjects === 0);
+    if (chkAllS) chkAllS.checked = (filteredSubjects.length > 0 && filteredSubjects.every(s => selectedSubjectSettingsIds.has(s.id)));
+
+    const countSelStu = document.getElementById('count-selected-students');
+    const btnDelStuNum = document.getElementById('btn-delete-students-num');
+    const btnDelStu = document.getElementById('btn-delete-selected-students');
+    const chkAllStu = document.getElementById('chk-all-students');
+    if (countSelStu) countSelStu.textContent = countStudents;
+    if (btnDelStuNum) btnDelStuNum.textContent = countStudents;
+    if (btnDelStu) btnDelStu.disabled = (countStudents === 0);
+    if (chkAllStu) chkAllStu.checked = (filteredStudents.length > 0 && filteredStudents.every(st => selectedStudentSettingsIds.has(st.id)));
 }
 
 // =========================================================================
@@ -11154,6 +11347,9 @@ function setupClaimEventListeners() {
     const btnClaimSettings = document.getElementById('btn-claim-settings');
     if (btnClaimSettings) {
         btnClaimSettings.addEventListener('click', () => {
+            selectedTeacherSettingsIds.clear();
+            selectedSubjectSettingsIds.clear();
+            selectedStudentSettingsIds.clear();
             renderSettingsLists();
             openModal('modal-settings');
         });
@@ -11263,8 +11459,14 @@ function setupClaimEventListeners() {
     });
 
     bindLiveInput('claim-input-credits', 'credits', () => {
-        activeClaim.credits = parseInt(document.getElementById('claim-input-credits').value) || 3;
+        const cr = parseInt(document.getElementById('claim-input-credits').value, 10) || 3;
+        activeClaim.credits = cr;
+        if (activeSubjectRef) {
+            activeSubjectRef.credits = cr;
+            if (activeSubjectRef.claimData) activeSubjectRef.claimData.credits = cr;
+        }
         renderA4Page1();
+        saveData();
     });
 
     const elThHrs = document.getElementById('claim-input-theory-hours');
