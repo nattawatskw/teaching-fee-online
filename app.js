@@ -10188,6 +10188,365 @@ function renderStudentsEditor() {
 }
 
 // -------------------------------------------------------------------------
+// SELECT STUDENTS MODAL FOR CLAIM SUBJECT
+// -------------------------------------------------------------------------
+let selectedStudentClaimKeys = new Set();
+let selectStudentsClaimEventsInitialized = false;
+
+function openSelectStudentsClaimModal() {
+    selectedStudentClaimKeys.clear();
+    const searchInput = document.getElementById('input-search-claim-students');
+    if (searchInput) searchInput.value = '';
+    const btnClear = document.getElementById('btn-clear-search-claim-students');
+    if (btnClear) btnClear.classList.add('hidden');
+
+    const quickBox = document.getElementById('box-quick-add-student');
+    if (quickBox) quickBox.classList.add('hidden');
+    const qId = document.getElementById('quick-add-student-id');
+    if (qId) qId.value = '';
+    const qName = document.getElementById('quick-add-student-name');
+    if (qName) qName.value = '';
+
+    renderSelectStudentsClaimModalList('');
+    initSelectStudentsClaimModalEvents();
+    openModal('modal-select-students-claim');
+
+    setTimeout(() => {
+        if (searchInput) searchInput.focus();
+    }, 100);
+}
+
+function renderSelectStudentsClaimModalList(query = '') {
+    const container = document.getElementById('claim-modal-students-list');
+    const selectedCounter = document.getElementById('claim-modal-selected-counter');
+    const totalCounter = document.getElementById('claim-modal-total-counter');
+    const btnConfirmCount = document.getElementById('btn-confirm-add-count');
+    const btnConfirm = document.getElementById('btn-confirm-add-selected-students');
+    if (!container) return;
+
+    const allStudents = (appData && appData.students) ? appData.students : [];
+    if (totalCounter) totalCounter.textContent = allStudents.length;
+
+    // Track existing students in activeClaim
+    const existingIds = new Set(
+        (activeClaim.students || []).map(s => (s.studentId || '').trim()).filter(Boolean)
+    );
+    const existingNames = new Set(
+        (activeClaim.students || []).map(s => {
+            return [s.name || '', s.surname || ''].filter(Boolean).join(' ').trim();
+        }).filter(Boolean)
+    );
+
+    const q = (query || '').trim().toLowerCase();
+    const filtered = allStudents.filter(st => {
+        if (!q) return true;
+        const nameMatch = (st.name || '').toLowerCase().includes(q);
+        const idMatch = (st.studentId || '').toLowerCase().includes(q);
+        return nameMatch || idMatch;
+    });
+
+    container.innerHTML = '';
+
+    if (allStudents.length === 0) {
+        container.innerHTML = `
+            <div class="py-8 text-center text-gray-400 space-y-2">
+                <i class="fa-solid fa-user-graduate text-3xl text-gray-500"></i>
+                <div class="text-xs">ยังไม่มีข้อมูลนักศึกษาในระบบ</div>
+                <div class="text-[11px] text-gray-500">คลิกปุ่ม <b>+ เพิ่ม นศ. ใหม่เข้าระบบ</b> ด้านบน เพื่อเพิ่มรายชื่อนักศึกษา</div>
+            </div>
+        `;
+    } else if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="py-8 text-center text-gray-400 space-y-2">
+                <i class="fa-solid fa-magnifying-glass text-2xl text-gray-500"></i>
+                <div class="text-xs">ไม่พบนักศึกษาที่ตรงกับคำค้นหา "${query}"</div>
+                <div class="text-[11px] text-gray-500">ลองตรวจสอบตัวสะกด หรือคลิกปุ่มเพิ่มนักศึกษาใหม่เข้าระบบ</div>
+            </div>
+        `;
+    } else {
+        filtered.forEach((st, idx) => {
+            const stName = (st.name || '').trim();
+            const stId = (st.studentId || '').trim();
+            const key = stId || st.id || `st_key_${idx}`;
+
+            const isInClaim = (stId && existingIds.has(stId)) || (stName && existingNames.has(stName));
+            const isSelected = selectedStudentClaimKeys.has(key);
+
+            const row = document.createElement('div');
+            if (isInClaim) {
+                row.className = 'flex items-center gap-3 p-2.5 rounded-xl border border-emerald-500/20 bg-emerald-950/10 opacity-75';
+                row.innerHTML = `
+                    <input type="checkbox" class="w-4 h-4 rounded text-emerald-500 bg-[#0f121d] border-emerald-500/50 cursor-not-allowed" checked disabled>
+                    <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="text-xs font-medium text-gray-300 truncate">${stName || 'ไม่ระบุชื่อ'}</div>
+                            <div class="text-[11px] font-mono text-gray-500">${stId || 'ไม่มีรหัส'}</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                            <i class="fa-solid fa-check text-[9px]"></i> มีในวิชานี้แล้ว
+                        </span>
+                    </div>
+                `;
+            } else {
+                row.className = `flex items-center gap-3 p-2.5 rounded-xl border transition cursor-pointer select-none ${
+                    isSelected ? 'bg-blue-950/30 border-blue-500/50 text-white' : 'border-transparent hover:border-[#2d3748] hover:bg-[#141829] text-gray-300'
+                }`;
+                row.innerHTML = `
+                    <input type="checkbox" class="claim-st-checkbox w-4 h-4 rounded text-blue-600 bg-[#0f121d] border-gray-600 cursor-pointer pointer-events-none" ${isSelected ? 'checked' : ''}>
+                    <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="text-xs font-medium text-white truncate">${stName || 'ไม่ระบุชื่อ'}</div>
+                            <div class="text-[11px] font-mono text-blue-400">${stId || 'ไม่มีรหัส'}</div>
+                        </div>
+                        ${isSelected ? '<span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0"><i class="fa-solid fa-check text-[9px]"></i> เลือกแล้ว</span>' : ''}
+                    </div>
+                `;
+
+                row.addEventListener('click', (e) => {
+                    if (selectedStudentClaimKeys.has(key)) {
+                        selectedStudentClaimKeys.delete(key);
+                    } else {
+                        selectedStudentClaimKeys.add(key);
+                    }
+                    updateSelectStudentsClaimCounts();
+                    renderSelectStudentsClaimModalList(document.getElementById('input-search-claim-students')?.value || '');
+                });
+            }
+            container.appendChild(row);
+        });
+    }
+
+    updateSelectStudentsClaimCounts();
+}
+
+function updateSelectStudentsClaimCounts() {
+    const selectedCounter = document.getElementById('claim-modal-selected-counter');
+    const btnConfirmCount = document.getElementById('btn-confirm-add-count');
+    const btnConfirm = document.getElementById('btn-confirm-add-selected-students');
+    const count = selectedStudentClaimKeys.size;
+
+    if (selectedCounter) selectedCounter.textContent = count;
+    if (btnConfirmCount) btnConfirmCount.textContent = count;
+    if (btnConfirm) {
+        if (count === 0) {
+            btnConfirm.disabled = true;
+            btnConfirm.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            btnConfirm.disabled = false;
+            btnConfirm.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+}
+
+function initSelectStudentsClaimModalEvents() {
+    if (selectStudentsClaimEventsInitialized) return;
+    selectStudentsClaimEventsInitialized = true;
+
+    // Search Input
+    const searchInput = document.getElementById('input-search-claim-students');
+    const btnClearSearch = document.getElementById('btn-clear-search-claim-students');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (btnClearSearch) {
+                if (val.trim()) btnClearSearch.classList.remove('hidden');
+                else btnClearSearch.classList.add('hidden');
+            }
+            renderSelectStudentsClaimModalList(val);
+        });
+    }
+
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', () => {
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+            btnClearSearch.classList.add('hidden');
+            renderSelectStudentsClaimModalList('');
+        });
+    }
+
+    // Select All (from currently filtered, excluding already in claim)
+    const btnSelectAll = document.getElementById('btn-claim-select-all-students');
+    if (btnSelectAll) {
+        btnSelectAll.addEventListener('click', () => {
+            const allStudents = (appData && appData.students) ? appData.students : [];
+            const existingIds = new Set(
+                (activeClaim.students || []).map(s => (s.studentId || '').trim()).filter(Boolean)
+            );
+            const existingNames = new Set(
+                (activeClaim.students || []).map(s => {
+                    return [s.name || '', s.surname || ''].filter(Boolean).join(' ').trim();
+                }).filter(Boolean)
+            );
+            const q = (searchInput?.value || '').trim().toLowerCase();
+
+            allStudents.forEach((st, idx) => {
+                const stName = (st.name || '').trim();
+                const stId = (st.studentId || '').trim();
+                if (q) {
+                    const nameMatch = stName.toLowerCase().includes(q);
+                    const idMatch = stId.toLowerCase().includes(q);
+                    if (!nameMatch && !idMatch) return;
+                }
+                const isInClaim = (stId && existingIds.has(stId)) || (stName && existingNames.has(stName));
+                if (!isInClaim) {
+                    const key = stId || st.id || `st_key_${idx}`;
+                    selectedStudentClaimKeys.add(key);
+                }
+            });
+            renderSelectStudentsClaimModalList(searchInput?.value || '');
+        });
+    }
+
+    // Deselect All
+    const btnDeselectAll = document.getElementById('btn-claim-deselect-all-students');
+    if (btnDeselectAll) {
+        btnDeselectAll.addEventListener('click', () => {
+            selectedStudentClaimKeys.clear();
+            renderSelectStudentsClaimModalList(searchInput?.value || '');
+        });
+    }
+
+    // Toggle Quick Add Form
+    const btnToggleQuick = document.getElementById('btn-toggle-quick-add-student');
+    const boxQuick = document.getElementById('box-quick-add-student');
+    const btnCancelQuick = document.getElementById('btn-cancel-quick-add-student');
+    const btnSaveQuick = document.getElementById('btn-save-quick-add-student');
+
+    if (btnToggleQuick && boxQuick) {
+        btnToggleQuick.addEventListener('click', () => {
+            boxQuick.classList.toggle('hidden');
+            if (!boxQuick.classList.contains('hidden')) {
+                const qId = document.getElementById('quick-add-student-id');
+                if (qId) qId.focus();
+            }
+        });
+    }
+
+    if (btnCancelQuick && boxQuick) {
+        btnCancelQuick.addEventListener('click', () => {
+            boxQuick.classList.add('hidden');
+        });
+    }
+
+    if (btnSaveQuick) {
+        btnSaveQuick.addEventListener('click', () => {
+            const idInput = document.getElementById('quick-add-student-id');
+            const nameInput = document.getElementById('quick-add-student-name');
+            const sid = idInput ? idInput.value.trim() : '';
+            const sname = nameInput ? nameInput.value.trim() : '';
+
+            if (!sid && !sname) {
+                alert('กรุณากรอกรหัสนักศึกษา หรือชื่อ-สกุล');
+                return;
+            }
+
+            if (!appData.students) appData.students = [];
+
+            // Check if student already exists in master students list
+            let existing = appData.students.find(s => 
+                (sid && s.studentId && s.studentId.trim() === sid) ||
+                (sname && s.name && s.name.trim() === sname)
+            );
+
+            let key = '';
+            if (existing) {
+                key = existing.studentId || existing.id;
+            } else {
+                const newStudent = {
+                    id: (typeof generateId === 'function') ? generateId() : 'st_' + Date.now(),
+                    studentId: sid,
+                    name: sname
+                };
+                appData.students.push(newStudent);
+                key = sid || newStudent.id;
+                saveData();
+            }
+
+            selectedStudentClaimKeys.add(key);
+
+            if (idInput) idInput.value = '';
+            if (nameInput) nameInput.value = '';
+            if (boxQuick) boxQuick.classList.add('hidden');
+
+            renderSelectStudentsClaimModalList(searchInput?.value || '');
+        });
+    }
+
+    // Confirm Add Selected Students
+    const btnConfirm = document.getElementById('btn-confirm-add-selected-students');
+    if (btnConfirm) {
+        btnConfirm.addEventListener('click', () => {
+            if (selectedStudentClaimKeys.size === 0) {
+                alert('กรุณาเลือกนักศึกษาอย่างน้อย 1 คน');
+                return;
+            }
+
+            if (!activeClaim.students) activeClaim.students = [];
+
+            const allStudents = (appData && appData.students) ? appData.students : [];
+            let addedCount = 0;
+
+            allStudents.forEach((st, idx) => {
+                const stName = (st.name || '').trim();
+                const stId = (st.studentId || '').trim();
+                const key = stId || st.id || `st_key_${idx}`;
+
+                if (selectedStudentClaimKeys.has(key)) {
+                    const splitted = splitThaiFullName(stName);
+                    const alreadyIn = activeClaim.students.some(s => {
+                        return (stId && s.studentId && s.studentId.trim() === stId) ||
+                               (s.name === splitted.name && s.surname === splitted.surname);
+                    });
+
+                    if (!alreadyIn) {
+                        activeClaim.students.push({
+                            studentId: stId,
+                            name: splitted.name || '',
+                            surname: splitted.surname || ''
+                        });
+                        addedCount++;
+                    }
+                }
+            });
+
+            activeClaim.studentCount = activeClaim.students.length;
+            if (activeSubjectRef) {
+                activeSubjectRef.studentCount = activeClaim.students.length;
+                if (activeSubjectRef.claimData) {
+                    activeSubjectRef.claimData.students = activeClaim.students;
+                    activeSubjectRef.claimData.studentCount = activeClaim.students.length;
+                }
+            }
+
+            const inpStudents = document.getElementById('claim-input-students');
+            if (inpStudents) inpStudents.value = activeClaim.students.length;
+
+            renderStudentsEditor();
+            renderA4Page1();
+            renderA4Page2();
+            updateCalculationsAndPreview();
+            saveData();
+            if (typeof triggerAutoCloudSync === 'function') {
+                triggerAutoCloudSync();
+            }
+
+            // Close modal
+            const modal = document.getElementById('modal-select-students-claim');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.classList.add('hidden');
+            }
+        });
+    }
+}
+
+window.openSelectStudentsClaimModal = openSelectStudentsClaimModal;
+
+// -------------------------------------------------------------------------
 // LIVE A4 RENDERING: PAGE 1 (ใบเบิกเงินค่าตอบแทนภาคสมทบ)
 // -------------------------------------------------------------------------
 function generateA4Page1HTML(claim = activeClaim) {
@@ -10827,22 +11186,11 @@ function setupClaimEventListeners() {
         });
     }
 
-    // Add Student Button in Tab 4
+    // Add Student Button in Tab 4 (Open multi-select modal)
     const btnAddStudent = document.getElementById('btn-add-student-to-subject');
     if (btnAddStudent) {
         btnAddStudent.addEventListener('click', () => {
-            if (!activeClaim.students) activeClaim.students = [];
-            activeClaim.students.push({
-                studentId: `6840121100${activeClaim.students.length + 1}`,
-                name: 'นักศึกษาใหม่',
-                surname: ''
-            });
-            activeClaim.studentCount = activeClaim.students.length;
-            if (activeSubjectRef) activeSubjectRef.studentCount = activeClaim.students.length;
-            document.getElementById('claim-input-students').value = activeClaim.students.length;
-            renderStudentsEditor();
-            renderA4Page2();
-            renderA4Page1();
+            openSelectStudentsClaimModal();
         });
     }
 

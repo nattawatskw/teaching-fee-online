@@ -1919,6 +1919,96 @@
         </div>
     </div>
 
+    <!-- Modal: Select Students for Claim Subject -->
+    <div id="modal-select-students-claim" class="modal fixed inset-0 bg-black/75 z-50 items-center justify-center p-4">
+        <div class="card-gradient w-full max-w-2xl rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-[#2d3748] flex justify-between items-center bg-[#1c2134]">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                        <i class="fa-solid fa-user-check text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">เลือกนักศึกษาเข้าสู่รายวิชา</h3>
+                        <p class="text-xs text-gray-400">ค้นหาและติ๊กเลือกนักศึกษาหลายคนพร้อมกันเพื่อเพิ่มในรายวิชา</p>
+                    </div>
+                </div>
+                <button type="button" class="close-modal text-gray-400 hover:text-white text-lg cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Search Bar & Controls -->
+            <div class="p-4 bg-[#151928] border-b border-[#2d3748] space-y-3">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                    <!-- Search Input -->
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                        <input type="text" id="input-search-claim-students" 
+                            class="w-full bg-[#0f121d] border border-[#2d3748] focus:border-blue-500 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-gray-500 transition focus:outline-none" 
+                            placeholder="พิมพ์ค้นหาชื่อ หรือรหัสนักศึกษา..." autocomplete="off">
+                        <button type="button" id="btn-clear-search-claim-students" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs cursor-pointer">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Action Buttons: Select All / Deselect All -->
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="btn-claim-select-all-students" class="px-3 py-2 bg-[#20283e] hover:bg-[#2c3754] text-blue-400 text-xs rounded-xl border border-blue-500/30 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer">
+                            <i class="fa-solid fa-check-double"></i> เลือกทั้งหมด
+                        </button>
+                        <button type="button" id="btn-claim-deselect-all-students" class="px-3 py-2 bg-[#20283e] hover:bg-[#2c3754] text-gray-400 hover:text-gray-200 text-xs rounded-xl border border-[#2d3748] transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer">
+                            <i class="fa-solid fa-xmark"></i> ล้างการเลือก
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Info & Quick Add Toggle -->
+                <div class="pt-2 border-t border-[#232a3d] flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <span class="text-xs text-gray-400">
+                        เลือกแล้ว <span id="claim-modal-selected-counter" class="text-blue-400 font-bold">0</span> คน 
+                        <span class="text-gray-500">|</span> 
+                        นักศึกษาในระบบทั้งหมด <span id="claim-modal-total-counter" class="text-gray-300 font-medium">0</span> คน
+                    </span>
+                    
+                    <button type="button" id="btn-toggle-quick-add-student" class="text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
+                        <i class="fa-solid fa-user-plus"></i> + เพิ่ม นศ. ใหม่เข้าระบบ
+                    </button>
+                </div>
+
+                <!-- Quick Add Form -->
+                <div id="box-quick-add-student" class="hidden p-3 bg-[#0d101b] border border-emerald-500/30 rounded-xl space-y-2.5">
+                    <div class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-plus"></i> เพิ่มข้อมูลนักศึกษาใหม่เข้าระบบ (และเลือกเข้าวิชานี้ทันที)
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input type="text" id="quick-add-student-id" placeholder="รหัสนักศึกษา (เช่น 68401211001)" class="bg-[#141725] border border-[#2d3748] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                        <input type="text" id="quick-add-student-name" placeholder="ชื่อ - สกุล (เช่น นายสมชาย ใจดี)" class="sm:col-span-2 bg-[#141725] border border-[#2d3748] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" id="btn-cancel-quick-add-student" class="px-3 py-1 text-xs text-gray-400 hover:text-white bg-[#1a2030] hover:bg-[#252c40] rounded-lg cursor-pointer">ยกเลิก</button>
+                        <button type="button" id="btn-save-quick-add-student" class="px-3 py-1 text-xs text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg flex items-center gap-1 cursor-pointer"><i class="fa-solid fa-check"></i> บันทึกและเลือกทันที</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student List Container -->
+            <div id="claim-modal-students-list" class="p-3 overflow-y-auto max-h-[380px] space-y-1 divide-y divide-[#232a3d]/40">
+                <!-- Dynamic student rows -->
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="px-6 py-3.5 border-t border-[#2d3748] bg-[#181c2d] flex items-center justify-between">
+                <button type="button" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-4 py-2 rounded-xl text-xs transition cursor-pointer">
+                    ยกเลิก
+                </button>
+                <button type="button" id="btn-confirm-add-selected-students" class="btn-primary px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/20 cursor-pointer">
+                    <i class="fa-solid fa-user-plus"></i> เพิ่มรายชื่อที่เลือก (<span id="btn-confirm-add-count">0</span> คน)
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Cloud Sync Status & Actions -->
     <div id="modal-cloud-sync" class="modal fixed inset-0 bg-black/75 z-50 items-center justify-center p-4">
         <div class="card-gradient w-full max-w-md rounded-2xl border border-[#2d3748] shadow-2xl overflow-hidden animate-in">
