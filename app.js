@@ -4733,8 +4733,10 @@ function createEmptyUserData(username, name = '') {
         : {};
     if (!isCivil) {
         defSig.programChair = '';
-    } else if (!defSig.programChair) {
-        defSig.programChair = 'นายณัฐวรรธน์ เกษกุล';
+        defSig.deptHead = '';
+    } else {
+        if (!defSig.programChair) defSig.programChair = 'นายณัฐวรรธน์ เกษกุล';
+        if (!defSig.deptHead) defSig.deptHead = 'นายปริวัฒน์ ยืนยิ่ง';
     }
 
     return {
@@ -4810,25 +4812,43 @@ function loadUserData(username) {
                 localStorage.setItem('teachingFeeData', JSON.stringify(loaded));
             }
         } else {
-            // For non-civil users, sanitize stale legacy 'นายปริวัฒน์ ยืนยิ่ง' in programChair
+            // For non-civil users, sanitize stale legacy 'นายปริวัฒน์ ยืนยิ่ง' in programChair and deptHead
             let needSave = false;
-            if (loaded.defaultSignatures2To9 && loaded.defaultSignatures2To9.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
-                loaded.defaultSignatures2To9.programChair = '';
-                needSave = true;
+            if (loaded.defaultSignatures2To9) {
+                if (loaded.defaultSignatures2To9.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
+                    loaded.defaultSignatures2To9.programChair = '';
+                    needSave = true;
+                }
+                if (loaded.defaultSignatures2To9.deptHead === 'นายปริวัฒน์ ยืนยิ่ง') {
+                    loaded.defaultSignatures2To9.deptHead = '';
+                    needSave = true;
+                }
             }
             if (loaded.terms && Array.isArray(loaded.terms)) {
                 loaded.terms.forEach(t => {
                     if (t.subjects && Array.isArray(t.subjects)) {
                         t.subjects.forEach(sub => {
-                            if (sub.claimData && sub.claimData.signatures && sub.claimData.signatures.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
-                                sub.claimData.signatures.programChair = '';
-                                needSave = true;
+                            if (sub.claimData && sub.claimData.signatures) {
+                                if (sub.claimData.signatures.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
+                                    sub.claimData.signatures.programChair = '';
+                                    needSave = true;
+                                }
+                                if (sub.claimData.signatures.deptHead === 'นายปริวัฒน์ ยืนยิ่ง') {
+                                    sub.claimData.signatures.deptHead = '';
+                                    needSave = true;
+                                }
                             }
                         });
                     }
-                    if (t.summaryClaimData && t.summaryClaimData.signatures && t.summaryClaimData.signatures.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
-                        t.summaryClaimData.signatures.programChair = '';
-                        needSave = true;
+                    if (t.summaryClaimData && t.summaryClaimData.signatures) {
+                        if (t.summaryClaimData.signatures.programChair === 'นายปริวัฒน์ ยืนยิ่ง') {
+                            t.summaryClaimData.signatures.programChair = '';
+                            needSave = true;
+                        }
+                        if (t.summaryClaimData.signatures.deptHead === 'นายปริวัฒน์ ยืนยิ่ง') {
+                            t.summaryClaimData.signatures.deptHead = '';
+                            needSave = true;
+                        }
                     }
                 });
             }
@@ -8902,7 +8922,7 @@ const DEFAULT_RC_CLAIM = {
         programChairRole: "ประธานหลักสูตรสาขาวิชาเทคโนโลยีโยธา",
         curriculumHead: "นายชนะ สุทธิประภา",
         curriculumHeadRole: "หัวหน้างานพัฒนาหลักสูตรสายเทคโนโลยีฯ",
-        deptHead: "นายปริวัฒน์ ยืนยิ่ง",
+        deptHead: "",
         deptHeadRole: "หัวหน้าสาขาวิชาเทคโนโลยีโยธา",
         techHead: "นายสถิระ กาญจันดา",
         techHeadRole: "หัวหน้างานภาควิชาเทคโนโลยีบัณฑิต",
@@ -8964,9 +8984,15 @@ function extractSignatures2To9(sig, deptName = '') {
 }
 
 function getDefaultSignatures2To9() {
+    const isCivil = (typeof currentUser !== 'undefined' && currentUser && currentUser.username === 'civilutc');
+
     // 1. Check if already saved in appData
     if (typeof appData !== 'undefined' && appData && appData.defaultSignatures2To9) {
         const d = appData.defaultSignatures2To9;
+        if (!isCivil) {
+            if (d.programChair === 'นายปริวัฒน์ ยืนยิ่ง') d.programChair = '';
+            if (d.deptHead === 'นายปริวัฒน์ ยืนยิ่ง') d.deptHead = '';
+        }
         if (d.director || d.academicDeputy || d.deptHead || d.programChair || d.curriculumHead) {
             return JSON.parse(JSON.stringify(d));
         }
@@ -8981,6 +9007,10 @@ function getDefaultSignatures2To9() {
                     const s = sub.claimData.signatures;
                     if (s.director || s.academicDeputy || s.deptHead || s.programChair || s.curriculumHead) {
                         const extracted = extractSignatures2To9(s);
+                        if (!isCivil) {
+                            if (extracted.programChair === 'นายปริวัฒน์ ยืนยิ่ง') extracted.programChair = '';
+                            if (extracted.deptHead === 'นายปริวัฒน์ ยืนยิ่ง') extracted.deptHead = '';
+                        }
                         appData.defaultSignatures2To9 = extracted;
                         if (typeof saveData === 'function') saveData();
                         return JSON.parse(JSON.stringify(extracted));
@@ -8997,6 +9027,10 @@ function getDefaultSignatures2To9() {
                         const s = sub.claimData.signatures;
                         if (s.director || s.academicDeputy || s.deptHead || s.programChair || s.curriculumHead) {
                             const extracted = extractSignatures2To9(s);
+                            if (!isCivil) {
+                                if (extracted.programChair === 'นายปริวัฒน์ ยืนยิ่ง') extracted.programChair = '';
+                                if (extracted.deptHead === 'นายปริวัฒน์ ยืนยิ่ง') extracted.deptHead = '';
+                            }
                             appData.defaultSignatures2To9 = extracted;
                             if (typeof saveData === 'function') saveData();
                             return JSON.parse(JSON.stringify(extracted));
@@ -9009,11 +9043,12 @@ function getDefaultSignatures2To9() {
 
     // 3. Fallback to DEFAULT_RC_CLAIM
     const fallback = extractSignatures2To9(typeof DEFAULT_RC_CLAIM !== 'undefined' ? DEFAULT_RC_CLAIM.signatures : null);
-    const isCivil = (typeof currentUser !== 'undefined' && currentUser && currentUser.username === 'civilutc');
     if (!isCivil) {
         fallback.programChair = '';
-    } else if (!fallback.programChair) {
-        fallback.programChair = 'นายณัฐวรรธน์ เกษกุล';
+        fallback.deptHead = '';
+    } else {
+        if (!fallback.programChair) fallback.programChair = 'นายณัฐวรรธน์ เกษกุล';
+        if (!fallback.deptHead) fallback.deptHead = 'นายปริวัฒน์ ยืนยิ่ง';
     }
     if (typeof appData !== 'undefined' && appData) {
         appData.defaultSignatures2To9 = fallback;
@@ -10940,7 +10975,7 @@ function generateA4Page1HTML(claim = activeClaim) {
         programChairRole: resolvedPCRole || defSig.programChairRole || defaultPCRole,
         curriculumHead: rawSig.curriculumHead || defSig.curriculumHead || 'นายชนะ สุทธิประภา',
         curriculumHeadRole: rawSig.curriculumHeadRole || defSig.curriculumHeadRole || 'หัวหน้างานพัฒนาหลักสูตรสายเทคโนโลยีฯ',
-        deptHead: rawSig.deptHead || defSig.deptHead || 'นายปริวัฒน์ ยืนยิ่ง',
+        deptHead: rawSig.deptHead || defSig.deptHead || ((!currentUser || currentUser.username === 'civilutc') ? 'นายปริวัฒน์ ยืนยิ่ง' : ''),
         deptHeadRole: resolvedDHRole || defSig.deptHeadRole || defaultDHRole,
         techHead: rawSig.techHead || defSig.techHead || 'นายสถิระ กาญจันดา',
         techHeadRole: rawSig.techHeadRole || defSig.techHeadRole || 'หัวหน้างานภาควิชาเทคโนโลยีบัณฑิต',
@@ -11151,7 +11186,7 @@ function generateA4Page1HTML(claim = activeClaim) {
                     <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
                         <div style="width: 48%; text-align: center;">
                             ลงชื่อ.................................................<br>
-                            ( ${sig.deptHead || 'นายปริวัฒน์ ยืนยิ่ง'} )<br>
+                            ( ${sig.deptHead || '.................................................'} )<br>
                             ${sig.deptHeadRole || defaultDHRole}
                         </div>
                         <div style="width: 48%; text-align: center;">
@@ -13788,7 +13823,9 @@ function openSummaryClaimModal(termId) {
     const sig = state.signatures || {};
     const defSig = getDefaultSignatures2To9();
     setVal('summary-sig-requester', sig.requester, defaultRequester);
-    setVal('summary-sig-dept-head', sig.deptHead, defSig.deptHead || 'นายปริวัฒน์ ยืนยิ่ง');
+    const isCivilSummary = (!currentUser || currentUser.username === 'civilutc');
+    const defSummaryDH = isCivilSummary ? 'นายปริวัฒน์ ยืนยิ่ง' : '';
+    setVal('summary-sig-dept-head', sig.deptHead, defSig.deptHead || defSummaryDH);
     setVal('summary-sig-verifier', sig.verifier, defSig.curriculumHead || 'นายชนะ   สุทธิประภา');
     setVal('summary-sig-verifier-role', sig.verifierRole, defSig.curriculumHeadRole || 'หัวหน้างานพัฒนาหลักสูตรสายเทคโนโลยีหรือสายปฏิบัติการ');
     setVal('summary-sig-academic-deputy', sig.academicDeputy, defSig.academicDeputy || 'นายสุวิชา  มั่นยืน');
@@ -14181,7 +14218,9 @@ function generateSummaryClaimA4HTML(term, selectedSubIds = null) {
     const sig = state.signatures || {};
     const defSig = (typeof getDefaultSignatures2To9 === 'function') ? getDefaultSignatures2To9() : {};
     const sigRequester = getVal('summary-sig-requester', sig.requester || requester);
-    const sigDeptHead = getVal('summary-sig-dept-head', sig.deptHead || defSig.deptHead || 'นายปริวัฒน์ ยืนยิ่ง');
+    const isCivilSummary = (!currentUser || currentUser.username === 'civilutc');
+    const defSummaryDH = isCivilSummary ? 'นายปริวัฒน์ ยืนยิ่ง' : '';
+    const sigDeptHead = getVal('summary-sig-dept-head', sig.deptHead || defSig.deptHead || defSummaryDH);
     const sigVerifier = getVal('summary-sig-verifier', sig.verifier || defSig.curriculumHead || 'นายชนะ   สุทธิประภา');
     const sigVerifierRole = getVal('summary-sig-verifier-role', sig.verifierRole || defSig.curriculumHeadRole || 'หัวหน้างานพัฒนาหลักสูตรสายเทคโนโลยีหรือสายปฏิบัติการ');
     const sigAcademic = getVal('summary-sig-academic-deputy', sig.academicDeputy || defSig.academicDeputy || 'นายสุวิชา  มั่นยืน');
@@ -14393,7 +14432,7 @@ function generateSummaryClaimA4HTML(term, selectedSubIds = null) {
                     </div>
                     <div style="width: 48%; text-align: center;">
                         ลงชื่อ .................................................... หัวหน้าสาขาวิชา<br>
-                        <span style="display: inline-block; margin-top: 3px;">(${sigDeptHead})</span>
+                        <span style="display: inline-block; margin-top: 3px;">(${sigDeptHead || '....................................................'})</span>
                     </div>
                 </div>
 
