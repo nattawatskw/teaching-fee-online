@@ -5,7 +5,7 @@ export default {
     const corsHeaders = {
       'Content-Type': 'application/json; charset=utf-8',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     };
 
@@ -13,13 +13,19 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    const kv = env.TEACHING_FEE_KV || env.KV || env.teaching_fee_kv;
+    const kv = env.TEACHING_FEE_KV || env.KV || env.teaching_fee_kv || env.DB;
 
     // Helper: Default Users List
     const getDefaultUsers = () => [
       { username: 'admin', password: '12345', role: 'admin', name: 'ผู้ดูแลระบบ (Admin)', createdAt: '2026-09-01T00:00:00.000Z' },
       { username: 'civilutc', password: 'civilutc12345', role: 'user', name: 'สาขาวิชาเทคโนโลยีโยธา', createdAt: '2026-09-01T00:00:00.000Z' }
     ];
+
+    // Helper: Get Storage Key for a User
+    const getStorageKey = (username) => {
+      const clean = (username || 'civilutc').toLowerCase().trim();
+      return clean === 'civilutc' ? 'teaching_fee_app_data' : `teaching_fee_app_data_${clean}`;
+    };
 
     // -------------------------------------------------------------------------
     // 1. API: User Registry & Admin Management (/api/auth/users)
@@ -134,6 +140,7 @@ export default {
 
           await kv.put('teaching_fee_users', JSON.stringify(users));
           await kv.delete(`teaching_fee_app_data_${targetUser}`);
+          await kv.delete(`teaching_fee_backup_${targetUser}_latest`);
 
           return new Response(JSON.stringify({ success: true, message: `ลบบัญชี ${targetUser} เรียบร้อยแล้ว` }), { status: 200, headers: corsHeaders });
         }
@@ -145,7 +152,32 @@ export default {
     }
 
     // -------------------------------------------------------------------------
-    // 2. API: Cloud Sync Endpoint (/api/sync) - Multi-user Isolated Storage
+    // 2. API: Server-Side Backup Restore Endpoint (/api/sync/backup)
+    // -------------------------------------------------------------------------
+    if (url.pathname === '/api/sync/backup') {
+      if (!kv) {
+        return new Response(JSON.stringify({ success: false, message: 'ยังไม่ได้ผูก KV' }), { status: 200, headers: corsHeaders });
+      }
+      try {
+        const reqUser = (url.searchParams.get('user') || 'civilutc').toLowerCase().trim();
+        const backupKey = `teaching_fee_backup_${reqUser}_latest`;
+        const { value, metadata } = await kv.getWithMetadata(backupKey, 'text');
+        if (!value) {
+          return new Response(JSON.stringify({ success: false, message: 'ไม่พบไฟล์สำรองบนคลาวด์สำหรับบัญชีนี้' }), { status: 200, headers: corsHeaders });
+        }
+        return new Response(JSON.stringify({
+          success: true,
+          data: JSON.parse(value),
+          user: reqUser,
+          backedUpAt: metadata?.backedUpAt || null
+        }), { status: 200, headers: corsHeaders });
+      } catch (err) {
+        return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. API: Cloud Sync Endpoint (/api/sync) - Multi-user Isolated Storage
     // -------------------------------------------------------------------------
     if (url.pathname === '/api/sync') {
       if (!kv) {
@@ -157,18 +189,33 @@ export default {
       }
 
       try {
-        // Determine user key
         const reqUser = (url.searchParams.get('user') || 'civilutc').toLowerCase().trim();
-        const kvKey = reqUser === 'civilutc' ? 'teaching_fee_app_data' : `teaching_fee_app_data_${reqUser}`;
+        const kvKey = getStorageKey(reqUser);
 
+        // GET: Fetch latest data or lightweight check
         if (request.method === 'GET') {
+          const isCheckOnly = url.searchParams.get('check') === 'true' || url.searchParams.get('checkOnly') === 'true';
+
           const { value, metadata } = await kv.getWithMetadata(kvKey, 'text');
+
+          if (isCheckOnly) {
+            return new Response(JSON.stringify({
+              success: true,
+              checkOnly: true,
+              hasData: Boolean(value),
+              user: reqUser,
+              updatedAt: metadata?.updatedAt || null,
+              revision: metadata?.revision || 1
+            }), { status: 200, headers: corsHeaders });
+          }
+
           if (!value) {
             return new Response(JSON.stringify({
               success: true,
               data: null,
               updatedAt: null,
               user: reqUser,
+              revision: 0,
               message: 'ยังไม่มีข้อมูลบนคลาวด์สำหรับบัญชีนี้'
             }), { status: 200, headers: corsHeaders });
           }
@@ -178,32 +225,63 @@ export default {
             success: true,
             data: parsed,
             user: reqUser,
-            updatedAt: metadata?.updatedAt || parsed.lastModified || null
+            updatedAt: metadata?.updatedAt || parsed.lastModified || null,
+            revision: metadata?.revision || 1
           }), { status: 200, headers: corsHeaders });
         }
 
+        // POST: Save data to cloud with conflict detection and automated server-side backup
         if (request.method === 'POST') {
           const body = await request.json();
           const targetUser = (body.user || reqUser || 'civilutc').toLowerCase().trim();
-          const targetKey = targetUser === 'civilutc' ? 'teaching_fee_app_data' : `teaching_fee_app_data_${targetUser}`;
+          const targetKey = getStorageKey(targetUser);
 
           const dataToSave = body.data || body;
           const updatedAt = body.updatedAt || new Date().toISOString();
+          const baseUpdatedAt = body.baseUpdatedAt;
+          const force = Boolean(body.force);
 
           if (!dataToSave || typeof dataToSave !== 'object') {
             return new Response(JSON.stringify({ success: false, error: 'รูปแบบข้อมูลไม่ถูกต้อง' }), { status: 400, headers: corsHeaders });
           }
 
+          // Check for existing data & conflict
+          const { value: existingVal, metadata: existingMeta } = await kv.getWithMetadata(targetKey, 'text');
+
+          if (!force && baseUpdatedAt && existingMeta?.updatedAt) {
+            const existingTime = new Date(existingMeta.updatedAt).getTime();
+            const baseTime = new Date(baseUpdatedAt).getTime();
+            // If someone else modified the cloud version after our base time (> 2500ms safety window)
+            if (existingTime - baseTime > 2500) {
+              return new Response(JSON.stringify({
+                success: false,
+                conflict: true,
+                serverUpdatedAt: existingMeta.updatedAt,
+                message: 'ข้อมูลบนคลาวด์ถูกแก้ไขจากอุปกรณ์อื่นแล้ว กรุณาตรวจสอบก่อนบันทึกทับ'
+              }), { status: 200, headers: corsHeaders });
+            }
+          }
+
+          // Automated server backup before overwrite!
+          if (existingVal) {
+            await kv.put(`teaching_fee_backup_${targetUser}_latest`, existingVal, {
+              metadata: { backedUpAt: new Date().toISOString(), prevUpdatedAt: existingMeta?.updatedAt || null }
+            });
+          }
+
+          const nextRevision = (existingMeta?.revision || 0) + 1;
           dataToSave.lastModified = updatedAt;
+
           await kv.put(targetKey, JSON.stringify(dataToSave), {
-            metadata: { updatedAt, user: targetUser }
+            metadata: { updatedAt, user: targetUser, revision: nextRevision }
           });
 
           return new Response(JSON.stringify({
             success: true,
             user: targetUser,
             updatedAt: updatedAt,
-            message: 'บันทึกข้อมูลเรียบร้อยแล้ว'
+            revision: nextRevision,
+            message: 'บันทึกข้อมูลขึ้นคลาวด์เรียบร้อยแล้ว'
           }), { status: 200, headers: corsHeaders });
         }
 
@@ -214,8 +292,12 @@ export default {
     }
 
     // -------------------------------------------------------------------------
-    // 3. Fallback to Static Assets
+    // 4. Fallback to Static Assets
     // -------------------------------------------------------------------------
-    return env.ASSETS.fetch(request);
+    if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+      return env.ASSETS.fetch(request);
+    }
+
+    return new Response('Not Found', { status: 404 });
   }
 };

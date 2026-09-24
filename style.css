@@ -1,3 +1,72 @@
+/* ====================================================
+   Local Embedded Fonts: TH Sarabun New & TH Sarabun PSK
+   (รับประกันฟอนต์ไม่เพี้ยน ไม่เลื่อน แม้ย้ายไปเครื่องอื่น)
+   ==================================================== */
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: local('TH Sarabun New'), local('THSarabunNew'), url('fonts/THSarabunNew.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: local('TH Sarabun New Bold'), local('THSarabunNew Bold'), url('fonts/THSarabunNew Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: local('TH Sarabun New Italic'), local('THSarabunNew Italic'), url('fonts/THSarabunNew Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: local('TH Sarabun New BoldItalic'), local('THSarabunNew BoldItalic'), url('fonts/THSarabunNew BoldItalic.ttf') format('truetype');
+  font-weight: bold;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Alias 'TH Sarabun PSK' to the same font files */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: local('TH Sarabun PSK'), local('THSarabunPSK'), local('TH Sarabun New'), url('fonts/THSarabunNew.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: local('TH Sarabun PSK Bold'), local('THSarabunPSK Bold'), local('TH Sarabun New Bold'), url('fonts/THSarabunNew Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: local('TH Sarabun PSK Italic'), local('THSarabunPSK Italic'), local('TH Sarabun New Italic'), url('fonts/THSarabunNew Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: local('TH Sarabun PSK BoldItalic'), local('THSarabunPSK BoldItalic'), local('TH Sarabun New BoldItalic'), url('fonts/THSarabunNew BoldItalic.ttf') format('truetype');
+  font-weight: bold;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   --bg-main: #141725;
   --bg-card: #1c2134;
@@ -105,21 +174,22 @@ input:focus, select:focus {
    A4 Document Preview & Print Styles
    ==================================================== */
 .sarabun-font {
-  font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif;
+  font-family: 'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif;
 }
 
 .a4-paper {
   width: 210mm;
   min-height: 297mm;
-  padding: 12mm 15mm 12mm 15mm;
+  max-width: 210mm;
+  padding: 10mm 12mm 10mm 12mm;
   margin: 0 auto 24px auto;
   background: #ffffff;
   color: #000000;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif;
+  font-family: 'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif;
   line-height: 1.25;
   box-sizing: border-box;
-  font-size: 15px;
+  font-size: 14pt;
   position: relative;
 }
 
@@ -132,25 +202,28 @@ input:focus, select:focus {
 }
 
 #doc-page-2, .doc-page-2 {
-  padding-left: 8mm !important;
-  padding-right: 8mm !important;
+  padding-left: 5mm !important;
+  padding-right: 5mm !important;
 }
 
 .doc-table {
-  width: 100%;
-  border-collapse: collapse;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  table-layout: fixed !important;
+  box-sizing: border-box !important;
 }
 
 .doc-table th, .doc-table td {
   border: 1px solid #000000;
   padding: 2px 4px;
+  box-sizing: border-box !important;
 }
 
 /* Print Rules */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 6mm 8mm;
+    margin: 0;
   }
   
   html, body {
@@ -198,7 +271,7 @@ input:focus, select:focus {
     min-height: auto !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 6mm 7mm 6mm 7mm !important;
+    padding: 6mm 8mm 6mm 8mm !important;
     box-shadow: none !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -208,7 +281,7 @@ input:focus, select:focus {
   }
 
   #doc-page-2, .doc-page-2 {
-    padding: 6mm 4mm 6mm 4mm !important;
+    padding: 6mm 5mm 6mm 5mm !important;
   }
 
   /* Only page-break between Page 1 and Page 2 when Page 1 is followed by visible Page 2 */
@@ -334,7 +407,7 @@ input:focus, select:focus {
     min-height: auto !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 6mm 7mm 6mm 7mm !important;
+    padding: 6mm 8mm 6mm 8mm !important;
     box-shadow: none !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -343,10 +416,10 @@ input:focus, select:focus {
     box-sizing: border-box !important;
   }
   body.printing-batch #batch-print-container .summary-claim-paper {
-    padding: 10mm 15mm 10mm 20mm !important;
+    padding: 12mm 15mm 10mm 25mm !important;
   }
   body.printing-batch #batch-print-container .doc-page-2 {
-    padding: 6mm 4mm 6mm 4mm !important;
+    padding: 6mm 5mm 6mm 5mm !important;
   }
   body.printing-batch #batch-print-container .a4-paper:last-child {
     page-break-after: auto !important;

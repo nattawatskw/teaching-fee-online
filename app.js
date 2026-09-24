@@ -4707,19 +4707,25 @@ function getCurrentUser() {
     try {
         const sessionUser = sessionStorage.getItem('teaching_fee_current_user');
         if (sessionUser) return JSON.parse(sessionUser);
+        const localUser = localStorage.getItem('teaching_fee_current_user');
+        if (localUser) return JSON.parse(localUser);
     } catch (e) {}
     return null;
 }
 
-function setCurrentUser(user) {
+function setCurrentUser(user, remember = true) {
     currentUser = user;
     if (user) {
         sessionStorage.setItem('teaching_fee_current_user', JSON.stringify(user));
+        if (remember) {
+            localStorage.setItem('teaching_fee_current_user', JSON.stringify(user));
+        } else {
+            localStorage.removeItem('teaching_fee_current_user');
+        }
     } else {
         sessionStorage.removeItem('teaching_fee_current_user');
+        localStorage.removeItem('teaching_fee_current_user');
     }
-    // Always clear legacy localStorage persistent remember keys so every new open requires login
-    localStorage.removeItem('teaching_fee_remembered_user');
 }
 
 function createEmptyUserData(username, name = '') {
@@ -4746,7 +4752,7 @@ function createEmptyUserData(username, name = '') {
         terms: [],
         departmentName: name || username || '',
         defaultSignatures2To9: defSig,
-        lastModified: new Date().toISOString()
+        lastModified: '1970-01-01T00:00:00.000Z'
     };
 }
 
@@ -4901,27 +4907,38 @@ function syncAllExtractedData(forceOverwrite = false) {
     if (typeof EXTRACTED_DATA === 'undefined' || !appData) return;
 
     const isCivil = !currentUser || currentUser.username === 'civilutc';
+    let changed = false;
 
     if (forceOverwrite && isCivil) {
         appData.teachers = JSON.parse(JSON.stringify(EXTRACTED_DATA.teachers || []));
         appData.subjects_master = JSON.parse(JSON.stringify(EXTRACTED_DATA.subjects || []));
+        changed = true;
     } else {
         // Teachers list: initialize only if completely empty
         if (!appData.teachers) appData.teachers = [];
         if (appData.teachers.length === 0 && EXTRACTED_DATA.teachers) {
             appData.teachers = JSON.parse(JSON.stringify(EXTRACTED_DATA.teachers));
+            changed = true;
         }
 
         // Subjects master: initialize only if completely empty on civil account initial setup
         if (isCivil) {
-            if (!appData.subjects_master) {
+            if (!appData.subjects_master || appData.subjects_master.length === 0) {
                 appData.subjects_master = JSON.parse(JSON.stringify(EXTRACTED_DATA.subjects || []));
+                changed = true;
             }
-            // DO NOT re-add deleted subjects or overwrite user credits!
         }
     }
 
-    saveData();
+    if (changed) {
+        const u = currentUser ? currentUser.username : 'civilutc';
+        const key = getUserStorageKey(u);
+        localStorage.setItem(key, JSON.stringify(appData));
+        if (u === 'civilutc') {
+            localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+        }
+    }
+
     updateTabCounts();
 }
 
@@ -7600,8 +7617,9 @@ async function handleLogin() {
         return;
     }
 
-    // Login successful - save to session only (must log in again after browser closes)
-    setCurrentUser(user);
+    // Login successful
+    const rememberMe = document.getElementById('login-remember-me')?.checked ?? true;
+    setCurrentUser(user, rememberMe);
     loadUserData(user.username);
     updateUserNavUI();
     switchView('semesters');
@@ -11116,7 +11134,7 @@ function generateA4Page1HTML(claim = activeClaim) {
             </div>
 
             <!-- 18 Weeks Split Table -->
-            <table class="doc-table" style="width: 100%; border-collapse: collapse; font-size: 14pt; margin-bottom: 10px;">
+            <table class="doc-table" style="width: 100%; border-collapse: collapse; font-size: 14pt; margin-bottom: 10px; table-layout: fixed;">
                 <thead>
                     <tr style="font-weight: bold; text-align: center; background-color: #fafafa;">
                         <th style="width: 6%; border: 1px solid #000; padding: 2px 1px;">สัปดาห์</th>
@@ -11339,12 +11357,12 @@ function generateA4Page2HTML(claim = activeClaim) {
             <table class="doc-table" style="width: 100%; border-collapse: collapse; font-family: 'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif; font-size: 14pt; margin: 0 auto 10px auto; table-layout: fixed;">
                 <thead>
                     <tr style="background-color: #f1f5f9;">
-                        <th rowspan="2" style="width: 36px; text-align: center; font-size: 14pt; padding: 3px 2px; border: 1px solid #000; white-space: nowrap;">ลำดับ</th>
-                        <th rowspan="2" style="width: 94px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 2px; border: 1px solid #000;">รหัสประจำตัว</th>
-                        <th rowspan="2" style="width: 120px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 2px; border: 1px solid #000;">ชื่อ</th>
-                        <th rowspan="2" style="width: 88px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 2px; border: 1px solid #000;">นามสกุล</th>
+                        <th rowspan="2" style="width: 32px; text-align: center; font-size: 14pt; padding: 3px 1px; border: 1px solid #000; white-space: nowrap;">ลำดับ</th>
+                        <th rowspan="2" style="width: 90px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 1px; border: 1px solid #000;">รหัสประจำตัว</th>
+                        <th rowspan="2" style="width: 110px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 2px; border: 1px solid #000;">ชื่อ</th>
+                        <th rowspan="2" style="width: 85px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 2px; border: 1px solid #000;">นามสกุล</th>
                         <th colspan="18" style="width: 306px; text-align: center; padding: 3px 0; font-size: 14pt; border: 1px solid #000;">สัปดาห์ที่ ${claim.teachingDaysPerWeek > 1 ? `1-${claim.totalWeeks || Math.ceil(18 / claim.teachingDaysPerWeek)} (18 ครั้ง)` : '1-18'}</th>
-                        <th rowspan="2" style="width: 96px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 2px; border: 1px solid #000;">ลายเซ็นต์นักศึกษา</th>
+                        <th rowspan="2" style="width: 90px; text-align: center; font-size: 14pt; white-space: nowrap; padding: 3px 1px; border: 1px solid #000;">ลายเซ็นต์นักศึกษา</th>
                     </tr>
                     <tr style="background-color: #f8fafc;">
                         ${weekHeaderCols}
@@ -14847,62 +14865,153 @@ function executeBatchPrint() {
 }
 
 // -------------------------------------------------------------------------
-// CLOUDFLARE PAGES REAL-TIME CLOUD SYNC ENGINE
+// CLOUDFLARE PAGES / WORKER REAL-TIME MULTI-DEVICE CLOUD SYNC ENGINE
+// (ระบบซิงค์ออนไลน์แยกตามบัญชีผู้ใช้ ป้องกันข้อมูลชนกัน และสำรองข้อมูลอัตโนมัติ)
 // -------------------------------------------------------------------------
 let cloudSyncStatus = 'offline'; // 'ready', 'syncing', 'setup_required', 'error', 'offline'
 let cloudSyncDebounceTimer = null;
+let lastKnownCloudTime = null;
+let cloudPollInterval = null;
+let isCloudBackgroundSyncActive = false;
 
-async function initCloudSync() {
-    const btnSync = document.getElementById('btn-cloud-sync');
-    const btnSyncNow = document.getElementById('btn-cloud-sync-now');
-    const btnPull = document.getElementById('btn-cloud-pull-force');
-    const btnPush = document.getElementById('btn-cloud-push-force');
+// 1. Helper: Safe Local Backup System (Safety Net)
+function saveLocalBackup(username, data, reason = 'อัตโนมัติ') {
+    if (!data || !username) return;
+    try {
+        const backupKey = `teaching_fee_backups_${username.toLowerCase().trim()}`;
+        const raw = localStorage.getItem(backupKey);
+        let list = raw ? JSON.parse(raw) : [];
 
-    if (btnSync) {
-        btnSync.onclick = () => {
-            openModal('modal-cloud-sync');
+        const backupItem = {
+            id: '_' + Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            reason: reason,
+            termCount: Array.isArray(data.terms) ? data.terms.length : 0,
+            subjectCount: Array.isArray(data.terms) ? data.terms.reduce((acc, t) => acc + (t.subjects ? t.subjects.length : 0), 0) : 0,
+            data: JSON.parse(JSON.stringify(data))
         };
-    }
 
-    if (btnSyncNow) {
-        btnSyncNow.onclick = async () => {
-            await doCloudSync(true);
-        };
+        list.unshift(backupItem);
+        if (list.length > 10) list = list.slice(0, 10); // Keep 10 most recent backups
+        localStorage.setItem(backupKey, JSON.stringify(list));
+        renderLocalBackupsUI();
+    } catch (e) {
+        console.warn('Failed to save local backup snapshot:', e);
     }
+}
 
-    if (btnPull) {
-        btnPull.onclick = async () => {
-            if (confirm('คุณต้องการดึงข้อมูลล่าสุดจาก Cloudflare มาทับข้อมูลในเครื่องนี้ใช่หรือไม่?')) {
-                await doCloudPull();
-            }
-        };
+function getLocalBackups(username) {
+    if (!username) return [];
+    try {
+        const backupKey = `teaching_fee_backups_${username.toLowerCase().trim()}`;
+        const raw = localStorage.getItem(backupKey);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        return [];
     }
+}
 
-    if (btnPush) {
-        btnPush.onclick = async () => {
-            if (confirm('คุณต้องการส่งข้อมูลในเครื่องนี้ขึ้นไปแทนที่บน Cloudflare ใช่หรือไม่?')) {
-                await doCloudPush(true);
-            }
-        };
-    }
+function restoreLocalBackup(backupId) {
+    const u = currentUser ? currentUser.username : 'civilutc';
+    const list = getLocalBackups(u);
+    const item = list.find(b => b.id === backupId);
+    if (!item) return alert('ไม่พบข้อมูลสำรองนี้');
 
-    // Check if running on Web (http / https)
-    const isWeb = window.location.protocol.startsWith('http');
-    if (!isWeb) {
-        updateCloudSyncUI('offline', 'ในเครื่อง (Local)');
+    const dt = new Date(item.timestamp).toLocaleString('th-TH');
+    if (!confirm(`ยืนยันการกู้คืนข้อมูลสำรองจากวันที่:\n${dt} (${item.reason})\n\n(ข้อมูลปัจจุบันจะถูกสำรองเก็บไว้ก่อนทำการกู้คืน)`)) {
         return;
     }
 
-    // Initial check and fetch on login/load
-    await doCloudSync(false);
+    saveLocalBackup(u, appData, 'ก่อนกู้คืนจากประวัติสำรอง');
+    appData = JSON.parse(JSON.stringify(item.data));
+    appData.lastModified = new Date().toISOString();
+
+    const key = getUserStorageKey(u);
+    localStorage.setItem(key, JSON.stringify(appData));
+    if (u === 'civilutc') {
+        localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+    }
+
+    refreshAllViews();
+    updateCloudSyncUI('ready', 'กู้คืนแล้ว', appData.lastModified);
+    alert('✓ กู้คืนข้อมูลสำรองเรียบร้อยแล้ว');
 }
 
+function renderLocalBackupsUI() {
+    const container = document.getElementById('cloud-backup-list');
+    if (!container) return;
+
+    const u = currentUser ? currentUser.username : 'civilutc';
+    const list = getLocalBackups(u);
+
+    if (list.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 text-center py-2 text-xs">ยังไม่มีประวัติสำรองข้อมูลในเครื่องนี้</div>';
+        return;
+    }
+
+    let html = '';
+    list.forEach(b => {
+        const d = new Date(b.timestamp);
+        const timeStr = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' (' + d.toLocaleDateString('th-TH') + ')';
+        html += `
+            <div class="bg-[#141725] border border-[#2d3748] rounded-lg p-2 flex items-center justify-between gap-2 hover:border-gray-500 transition">
+                <div>
+                    <div class="font-medium text-gray-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-regular fa-calendar-check text-blue-400"></i> ${timeStr}
+                    </div>
+                    <div class="text-[11px] text-gray-400 mt-0.5">
+                        ${b.reason} • ${b.termCount} ภาคเรียน (${b.subjectCount} วิชา)
+                    </div>
+                </div>
+                <button type="button" onclick="restoreLocalBackup('${b.id}')" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold rounded-lg border border-amber-500/30 transition shrink-0 cursor-pointer">
+                    กู้คืน
+                </button>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+// 2. Refresh all UI views safely
+function refreshAllViews() {
+    if (currentView === 'semesters') {
+        renderSemestersView();
+    } else if (currentView === 'subjects') {
+        if (typeof renderSubjectsView === 'function') renderSubjectsView(currentTermId);
+    } else if (currentView === 'claim-form') {
+        if (activeSubjectRef) {
+            populateSidebarFromClaimData();
+            renderWeeksEditor();
+            renderStudentsEditor();
+            renderA4Page1();
+            renderA4Page2();
+        }
+    }
+    if (typeof renderAnnualDaysChart === 'function') renderAnnualDaysChart();
+    updateTabCounts();
+}
+
+// 3. UI Update Helpers
 function updateCloudSyncUI(status, label, updatedAt) {
     cloudSyncStatus = status;
     const dot = document.getElementById('cloud-sync-dot');
     const text = document.getElementById('cloud-sync-text');
     const badge = document.getElementById('cloud-status-badge');
     const lastSyncText = document.getElementById('cloud-last-sync-text');
+    const userText = document.getElementById('cloud-sync-user-text');
+    const deviceText = document.getElementById('cloud-device-sync-text');
+
+    const u = currentUser ? currentUser.username : 'civilutc';
+    if (userText) userText.textContent = u;
+
+    if (deviceText && appData && appData.lastModified && appData.lastModified !== '1970-01-01T00:00:00.000Z') {
+        const dDev = new Date(appData.lastModified);
+        deviceText.textContent = !isNaN(dDev.getTime()) 
+            ? dDev.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' (' + dDev.toLocaleDateString('th-TH') + ')' 
+            : appData.lastModified;
+    } else if (deviceText) {
+        deviceText.textContent = '-';
+    }
 
     if (dot && text) {
         if (status === 'ready') {
@@ -14949,11 +15058,39 @@ function updateCloudSyncUI(status, label, updatedAt) {
     }
 }
 
+// 4. Toast Notification for Multi-device Updates
+let toastTimeout = null;
+function showCloudUpdateToast(cloudUpdatedAt) {
+    const toast = document.getElementById('cloud-sync-toast');
+    if (!toast) return;
+
+    const desc = document.getElementById('cloud-sync-toast-desc');
+    if (desc && cloudUpdatedAt) {
+        const d = new Date(cloudUpdatedAt);
+        desc.textContent = `มีการบันทึกข้อมูลจากอุปกรณ์อื่น (${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })})`;
+    }
+
+    toast.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+    toast.classList.add('translate-y-0', 'opacity-100');
+
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(hideCloudUpdateToast, 12000);
+}
+
+function hideCloudUpdateToast() {
+    const toast = document.getElementById('cloud-sync-toast');
+    if (!toast) return;
+    toast.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+    toast.classList.remove('translate-y-0', 'opacity-100');
+}
+
+// 5. Core Synchronization Logic
 async function doCloudSync(isManual = false) {
     if (!window.location.protocol.startsWith('http')) return;
     try {
         const u = currentUser ? currentUser.username : 'civilutc';
         updateCloudSyncUI('syncing');
+
         const res = await fetch(`/api/sync?user=${encodeURIComponent(u)}`);
         if (!res.ok) {
             updateCloudSyncUI('error', 'ซิงค์ผิดพลาด');
@@ -14966,29 +15103,57 @@ async function doCloudSync(isManual = false) {
         }
 
         if (json.success) {
-            if (json.data && (json.data.terms || json.data.teachers)) {
-                const cloudTime = json.updatedAt ? new Date(json.updatedAt).getTime() : 0;
-                const localTime = appData && appData.lastModified ? new Date(appData.lastModified).getTime() : 0;
+            const cloudHasData = json.data && ((json.data.terms && json.data.terms.length > 0) || (json.data.subjects_master && json.data.subjects_master.length > 0) || (json.data.teachers && json.data.teachers.length > 0));
+            const localHasData = appData && ((appData.terms && appData.terms.length > 0) || (appData.subjects_master && appData.subjects_master.length > 0));
 
-                if (cloudTime > localTime) {
+            const cloudTime = json.updatedAt ? new Date(json.updatedAt).getTime() : 0;
+            const localTime = appData && appData.lastModified ? new Date(appData.lastModified).getTime() : 0;
+
+            if (cloudHasData) {
+                // If local has no data, or cloud is genuinely newer -> adopt cloud
+                if (!localHasData || cloudTime > localTime) {
+                    saveLocalBackup(u, appData, 'ก่อนอัปเดตจากคลาวด์');
                     appData = json.data;
+                    lastKnownCloudTime = json.updatedAt;
                     const key = getUserStorageKey(u);
                     localStorage.setItem(key, JSON.stringify(appData));
                     if (u === 'civilutc') {
                         localStorage.setItem('teachingFeeData', JSON.stringify(appData));
                     }
-                    if (currentView === 'semesters') renderSemestersView();
-                    if (typeof renderAnnualDaysChart === 'function') renderAnnualDaysChart();
-                } else if (localTime > cloudTime || !json.data) {
-                    await doCloudPush(false);
+                    refreshAllViews();
+                } else if (localTime > cloudTime) {
+                    // Local is newer. Check if cloud was modified since lastKnownCloudTime
+                    const lastKnown = lastKnownCloudTime ? new Date(lastKnownCloudTime).getTime() : 0;
+                    if (lastKnown > 0 && cloudTime > lastKnown) {
+                        // Conflict: another machine wrote to cloud while this machine made edits
+                        const dt = new Date(cloudTime).toLocaleString('th-TH');
+                        if (confirm(`⚠️ พบข้อมูลบนคลาวด์ถูกแก้ไขจากอุปกรณ์อื่น (${dt})\n\nกด "ตกลง (OK)" เพื่อดึงข้อมูลล่าสุดจากคลาวด์ (ข้อมูลเครื่องนี้จะถูกสำรองไว้)\nกด "ยกเลิก (Cancel)" หากต้องการส่งข้อมูลเครื่องนี้ขึ้นไปแทนที่`)) {
+                            saveLocalBackup(u, appData, 'ก่อนดึงข้อมูลคลาวด์แก้ Conflict');
+                            appData = json.data;
+                            lastKnownCloudTime = json.updatedAt;
+                            const key = getUserStorageKey(u);
+                            localStorage.setItem(key, JSON.stringify(appData));
+                            if (u === 'civilutc') localStorage.setItem('teachingFeeData', JSON.stringify(appData));
+                            refreshAllViews();
+                        } else {
+                            await doCloudPush(false, true);
+                        }
+                    } else {
+                        // Normal local modifications -> push to cloud
+                        await doCloudPush(false);
+                    }
+                } else {
+                    lastKnownCloudTime = json.updatedAt;
                 }
-            } else if (!json.data && appData && ((appData.terms && appData.terms.length > 0) || (appData.teachers && appData.teachers.length > 0))) {
+            } else if (localHasData) {
+                // Cloud has no data, local has data -> push to initialize cloud
                 await doCloudPush(false);
             }
 
-            const timeStr = json.updatedAt || new Date().toISOString();
+            const timeStr = lastKnownCloudTime || json.updatedAt || new Date().toISOString();
             updateCloudSyncUI('ready', 'คลาวด์ซิงค์', timeStr);
-            if (isManual) alert('ซิงค์ข้อมูลกับคลาวด์เรียบร้อยแล้ว!');
+            hideCloudUpdateToast();
+            if (isManual) alert('✓ ซิงค์ข้อมูลกับคลาวด์เรียบร้อยแล้ว');
         }
     } catch (err) {
         console.warn('Cloud sync error:', err);
@@ -14996,7 +15161,7 @@ async function doCloudSync(isManual = false) {
     }
 }
 
-async function doCloudPush(showAlert = true) {
+async function doCloudPush(showAlert = true, force = false) {
     if (!window.location.protocol.startsWith('http')) return;
     try {
         const u = currentUser ? currentUser.username : 'civilutc';
@@ -15014,12 +15179,27 @@ async function doCloudPush(showAlert = true) {
         const res = await fetch('/api/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: u, data: appData, updatedAt: now })
+            body: JSON.stringify({
+                user: u,
+                data: appData,
+                updatedAt: now,
+                baseUpdatedAt: lastKnownCloudTime,
+                force: force
+            })
         });
         const json = await res.json();
         if (json.success) {
-            updateCloudSyncUI('ready', 'คลาวด์ซิงค์', now);
-            if (showAlert) alert('ส่งข้อมูลขึ้น Cloudflare KV เรียบร้อยแล้ว!');
+            lastKnownCloudTime = json.updatedAt || now;
+            updateCloudSyncUI('ready', 'คลาวด์ซิงค์', lastKnownCloudTime);
+            hideCloudUpdateToast();
+            if (showAlert) alert('✓ ส่งข้อมูลขึ้น Cloudflare KV เรียบร้อยแล้ว');
+        } else if (json.conflict) {
+            updateCloudSyncUI('error', 'ข้อมูลขัดแย้ง');
+            if (confirm('⚠️ ข้อมูลบนคลาวด์ถูกแก้ไขจากอุปกรณ์อื่นแล้วในขณะที่คุณกำลังใช้งาน\n\nต้องการ "ดึงข้อมูลล่าสุดจากคลาวด์" หรือไม่? (ข้อมูลเครื่องนี้จะถูกสำรองไว้ก่อน)')) {
+                await doCloudPull();
+            } else if (confirm('คุณแน่ใจหรือไม่ว่าต้องการ "ส่งข้อมูลเครื่องนี้ทับคลาวด์"?')) {
+                await doCloudPush(showAlert, true);
+            }
         } else {
             updateCloudSyncUI('error');
             if (showAlert) alert('ส่งข้อมูลไม่สำเร็จ: ' + (json.message || json.error));
@@ -15038,16 +15218,18 @@ async function doCloudPull() {
         const res = await fetch(`/api/sync?user=${encodeURIComponent(u)}`);
         const json = await res.json();
         if (json.success && json.data) {
+            saveLocalBackup(u, appData, 'ก่อนดึงข้อมูลแทนที่');
             appData = json.data;
+            lastKnownCloudTime = json.updatedAt;
             const key = getUserStorageKey(u);
             localStorage.setItem(key, JSON.stringify(appData));
             if (u === 'civilutc') {
                 localStorage.setItem('teachingFeeData', JSON.stringify(appData));
             }
-            if (currentView === 'semesters') renderSemestersView();
-            renderAnnualChart();
+            refreshAllViews();
             updateCloudSyncUI('ready', 'คลาวด์ซิงค์', json.updatedAt || new Date().toISOString());
-            alert('ดึงข้อมูลล่าสุดจาก Cloudflare เรียบร้อยแล้ว!');
+            hideCloudUpdateToast();
+            alert('✓ ดึงข้อมูลล่าสุดจาก Cloudflare เรียบร้อยแล้ว');
         } else {
             alert('ไม่พบข้อมูลบนคลาวด์ หรือยังไม่ได้ผูก KV');
             updateCloudSyncUI('setup_required');
@@ -15065,4 +15247,141 @@ function triggerAutoCloudSync() {
     cloudSyncDebounceTimer = setTimeout(() => {
         doCloudPush(false);
     }, 2500);
+}
+
+// 6. Background Liveness & Focus Sync ("ทิ้งไว้สักพัก")
+async function checkCloudUpdatesSilently() {
+    if (!window.location.protocol.startsWith('http')) return;
+    if (!currentUser) return;
+
+    try {
+        const u = currentUser.username;
+        const res = await fetch(`/api/sync?user=${encodeURIComponent(u)}&check=true`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json.success || !json.updatedAt) return;
+
+        const cloudTime = new Date(json.updatedAt).getTime();
+        const localTime = appData && appData.lastModified ? new Date(appData.lastModified).getTime() : 0;
+        const lastKnown = lastKnownCloudTime ? new Date(lastKnownCloudTime).getTime() : 0;
+
+        // If cloud was updated after our current data and after our last known sync
+        if (cloudTime > localTime && cloudTime > lastKnown) {
+            const isEditing = Boolean(
+                document.querySelector('.modal.active') || 
+                (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT' || document.activeElement.tagName === 'TEXTAREA'))
+            );
+
+            if (isEditing) {
+                showCloudUpdateToast(json.updatedAt);
+            } else {
+                console.log('Auto-syncing newer cloud data from another device...');
+                await doCloudSync(false);
+            }
+        }
+    } catch (e) {
+        // Silent failure in background
+    }
+}
+
+function setupCloudBackgroundSync() {
+    if (isCloudBackgroundSyncActive) return;
+    isCloudBackgroundSyncActive = true;
+
+    // Visibility / Tab Switch
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkCloudUpdatesSilently();
+        }
+    });
+
+    // Window Focus
+    window.addEventListener('focus', () => {
+        checkCloudUpdatesSilently();
+    });
+
+    // Heartbeat Poll every 45s while tab is idle
+    if (cloudPollInterval) clearInterval(cloudPollInterval);
+    cloudPollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            checkCloudUpdatesSilently();
+        }
+    }, 45000);
+}
+
+// 7. Initialize Cloud Sync Component
+async function initCloudSync() {
+    const btnSync = document.getElementById('btn-cloud-sync');
+    const btnSyncNow = document.getElementById('btn-cloud-sync-now');
+    const btnPull = document.getElementById('btn-cloud-pull-force');
+    const btnPush = document.getElementById('btn-cloud-push-force');
+    const btnToggleBackups = document.getElementById('btn-toggle-backup-list');
+    const btnToastSync = document.getElementById('btn-toast-sync-now');
+
+    if (btnSync) {
+        btnSync.onclick = () => {
+            renderLocalBackupsUI();
+            updateCloudSyncUI(cloudSyncStatus, null, lastKnownCloudTime);
+            openModal('modal-cloud-sync');
+        };
+    }
+
+    if (btnSyncNow) {
+        btnSyncNow.onclick = async () => {
+            await doCloudSync(true);
+        };
+    }
+
+    if (btnPull) {
+        btnPull.onclick = async () => {
+            if (confirm('คุณต้องการดึงข้อมูลล่าสุดจาก Cloudflare มาทับข้อมูลในเครื่องนี้ใช่หรือไม่?\n(ข้อมูลปัจจุบันในเครื่องนี้จะถูกสำรองไว้ให้อัตโนมัติ)')) {
+                await doCloudPull();
+            }
+        };
+    }
+
+    if (btnPush) {
+        btnPush.onclick = async () => {
+            if (confirm('คุณต้องการส่งข้อมูลในเครื่องนี้ขึ้นไปแทนที่บน Cloudflare ใช่หรือไม่?')) {
+                await doCloudPush(true, true);
+            }
+        };
+    }
+
+    if (btnToggleBackups) {
+        btnToggleBackups.onclick = () => {
+            const listEl = document.getElementById('cloud-backup-list');
+            const chev = document.getElementById('backup-list-chevron');
+            if (listEl) {
+                const isHidden = listEl.classList.contains('hidden');
+                if (isHidden) {
+                    listEl.classList.remove('hidden');
+                    if (chev) chev.classList.add('rotate-180');
+                    renderLocalBackupsUI();
+                } else {
+                    listEl.classList.add('hidden');
+                    if (chev) chev.classList.remove('rotate-180');
+                }
+            }
+        };
+    }
+
+    if (btnToastSync) {
+        btnToastSync.onclick = async () => {
+            hideCloudUpdateToast();
+            await doCloudSync(true);
+        };
+    }
+
+    window.restoreLocalBackup = restoreLocalBackup;
+
+    // Check if running on Web (http / https)
+    const isWeb = window.location.protocol.startsWith('http');
+    if (!isWeb) {
+        updateCloudSyncUI('offline', 'ในเครื่อง (Local)');
+        return;
+    }
+
+    setupCloudBackgroundSync();
+    await doCloudSync(false);
 }

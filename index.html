@@ -6,9 +6,8 @@
     <title>ระบบเบิกเงินค่าตอบแทนภาคสมทบ ป.ตรี</title>
 
     
-    <!-- Google Fonts & TH Sarabun New -->
+    <!-- Google Fonts (Fallback) -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lazywasabi/thai-web-fonts@7/fonts/THSarabunNew/style.css">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -125,6 +124,13 @@
                         </div>
 
 
+
+                        <div class="flex items-center justify-between text-xs text-gray-400 pt-1">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <input type="checkbox" id="login-remember-me" class="rounded bg-[#141725] border-[#2d3748] text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer" checked>
+                                <span>จดจำการเข้าสู่ระบบบนเครื่องนี้</span>
+                            </label>
+                        </div>
 
                         <!-- Login Button -->
                         <button type="button" id="btn-login-submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-lg shadow-blue-500/25 transition cursor-pointer flex items-center justify-center gap-2">
@@ -2088,15 +2094,23 @@
                         </span>
                     </div>
                     <div class="flex items-center justify-between text-xs text-gray-400">
-                        <span>ซิงค์ล่าสุด:</span>
+                        <span>บัญชีผู้ใช้งาน:</span>
+                        <span id="cloud-sync-user-text" class="text-blue-300 font-mono font-medium">civilutc</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-gray-400">
+                        <span>ข้อมูลบนคลาวด์ล่าสุด:</span>
                         <span id="cloud-last-sync-text" class="text-gray-200 font-medium">-</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-gray-400">
+                        <span>ข้อมูลในเครื่องนี้:</span>
+                        <span id="cloud-device-sync-text" class="text-gray-300 font-medium">-</span>
                     </div>
                 </div>
 
                 <!-- Info Note -->
                 <div id="cloud-sync-help" class="text-xs text-gray-400 bg-blue-950/30 border border-blue-800/40 p-3 rounded-lg leading-relaxed">
                     <i class="fa-solid fa-circle-info text-blue-400 mr-1"></i>
-                    ระบบจะบันทึกและซิงค์ข้อมูลขึ้น Cloudflare KV อัตโนมัติทุกครั้งที่มีการแก้ไข ทำให้เปิดใช้งานอุปกรณ์ไหนก็มีข้อมูลตรงกันเสมอ
+                    ระบบซิงค์แบบแยกบัญชีอัตโนมัติ พร้อมระบบตรวจจับเมื่อเปิดหลายเครื่องและสำรองข้อมูลในเครื่องให้อัตโนมัติทุกครั้งที่ซิงค์
                 </div>
 
                 <!-- Action Buttons -->
@@ -2113,6 +2127,19 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Local Backup History Accordion -->
+                <div class="pt-2 border-t border-[#2d3748]">
+                    <button type="button" id="btn-toggle-backup-list" class="w-full text-xs text-gray-400 hover:text-white flex items-center justify-between py-1.5 transition cursor-pointer">
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> ประวัติสำรองข้อมูลในเครื่อง (Backups)
+                        </span>
+                        <i id="backup-list-chevron" class="fa-solid fa-chevron-down text-gray-500 text-xs transition-transform"></i>
+                    </button>
+                    <div id="cloud-backup-list" class="hidden mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1 text-xs">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
             </div>
             <div class="px-6 py-3 border-t border-[#2d3748] bg-[#181c2d] flex justify-end">
                 <button type="button" class="close-modal bg-[#2d3748] hover:bg-[#3f4b61] text-gray-300 hover:text-white px-4 py-1.5 rounded-lg text-xs transition cursor-pointer">
@@ -2120,6 +2147,20 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- Floating Cloud Sync Toast Notification -->
+    <div id="cloud-sync-toast" class="fixed bottom-6 right-6 z-50 bg-[#1c2134] border border-blue-500/50 shadow-2xl rounded-2xl px-5 py-3.5 text-white flex items-center gap-3 transition-all duration-300 translate-y-24 opacity-0 pointer-events-none">
+        <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-cloud-arrow-down"></i>
+        </div>
+        <div>
+            <div id="cloud-sync-toast-title" class="font-bold text-xs text-white">ตรวจพบข้อมูลใหม่บนคลาวด์</div>
+            <div id="cloud-sync-toast-desc" class="text-xs text-gray-400">มีการบันทึกข้อมูลจากอุปกรณ์อื่น</div>
+        </div>
+        <button type="button" id="btn-toast-sync-now" class="ml-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition pointer-events-auto cursor-pointer">
+            อัปเดตเดี๋ยวนี้
+        </button>
     </div>
 
     <!-- Hidden Batch Print Container (Used strictly during batch printing) -->
